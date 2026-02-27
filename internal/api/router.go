@@ -31,14 +31,17 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	channelRepo := repository.NewChannelRepository(db)
+	messageRepo := repository.NewMessageRepository(db)
 
 	// Initialize services
 	authService := service.NewAuthService(userRepo, jwtSecret)
 	channelService := service.NewChannelService(channelRepo)
+	messageService := service.NewMessageService(messageRepo, channelRepo)
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	channelHandler := handlers.NewChannelHandler(channelService)
+	messageHandler := handlers.NewMessageHandler(messageService)
 
 	// Authentication routes (public)
 	r.Route("/api/v1/auth", func(r chi.Router) {
@@ -55,6 +58,10 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 			r.Post("/", channelHandler.Create)
 			r.Get("/", channelHandler.List)
 			r.Get("/{id}", channelHandler.Get)
+			
+			// Message routes (nested under channels)
+			r.Post("/{channel_id}/messages", messageHandler.Send)
+			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
 		})
 	})
 

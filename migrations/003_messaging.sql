@@ -33,3 +33,17 @@ CREATE TRIGGER update_channels_updated_at
 CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
 CREATE INDEX IF NOT EXISTS idx_channel_members_channel ON channel_members(channel_id);
 CREATE INDEX IF NOT EXISTS idx_channel_members_user ON channel_members(user_id);
+
+-- Messages table
+CREATE TABLE IF NOT EXISTS messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    author_id UUID NOT NULL,
+    author_type TEXT NOT NULL DEFAULT 'user',
+    text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_text_length CHECK (LENGTH(text) > 0 AND LENGTH(text) <= 10000)
+);
+
+-- Index for message queries (channel + time-based pagination)
+CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at DESC);

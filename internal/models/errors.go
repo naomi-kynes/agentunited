@@ -37,4 +37,10 @@ var (
 
 	// ErrAlreadyChannelMember indicates user is already a member
 	ErrAlreadyChannelMember = errors.New("already a member of this channel")
+
+	// ErrMessageNotFound indicates message does not exist
+	ErrMessageNotFound = errors.New("message not found")
+
+	// ErrInvalidMessageText indicates message text is invalid (empty or too long)
+	ErrInvalidMessageText = errors.New("message text must be between 1 and 10,000 characters")
 )
