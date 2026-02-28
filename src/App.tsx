@@ -3,6 +3,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { ChatPage } from './pages/ChatPage';
+import { AgentFoundationSettingsPage } from './pages/AgentFoundationSettingsPage';
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -27,6 +28,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ChatPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/agents/:agentId/settings"
+          element={
+            <ProtectedRoute>
+              <AgentFoundationSettingsPage />
             </ProtectedRoute>
           }
         />
