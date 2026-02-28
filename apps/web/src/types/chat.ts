@@ -1,0 +1,22 @@
+export interface Message {
+  id: string;
+  channelId: string;
+  author: string;
+  authorId: string;
+  text: string;
+  timestamp: string; // ISO 8601
+  isOwnMessage: boolean;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  topic: string;
+  memberCount?: number;
+}
+
+export interface WebSocketMessage {
+  type: 'message' | 'connected' | 'error' | 'typing';
+  data?: any;
+  message?: Message;
+}
