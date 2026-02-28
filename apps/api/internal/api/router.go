@@ -42,6 +42,13 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	authHandler := handlers.NewAuthHandler(authService)
 	channelHandler := handlers.NewChannelHandler(channelService)
 	messageHandler := handlers.NewMessageHandler(messageService)
+	
+	// Initialize WebSocket hub and handler
+	hub := handlers.NewHub()
+	wsHandler := handlers.NewWebSocketHandlerV2(messageService, channelService, jwtSecret, hub)
+
+	// WebSocket endpoint (query param auth, not middleware)
+	r.Handle("/ws", wsHandler)
 
 	// Authentication routes (public)
 	r.Route("/api/v1/auth", func(r chi.Router) {
