@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http/httptest"
 	"testing"
@@ -62,6 +63,93 @@ func TestWebSocketHandler_HasWSRoute(t *testing.T) {
 	h := NewWebSocketHandler(nil, nil, "test-secret")
 	require.NotNil(t, h)
 	assert.NotNil(t, h)
+}
+
+type mockPubSub struct {
+	publishedChannel string
+	publishedMessage string
+	subscribed       []string
+}
+
+func (m *mockPubSub) Publish(_ context.Context, channel, message string) error {
+	m.publishedChannel = channel
+	m.publishedMessage = message
+	return nil
+}
+
+func (m *mockPubSub) Subscribe(_ context.Context, channel string) error {
+	m.subscribed = append(m.subscribed, channel)
+	return nil
+}
+
+func TestWebSocketHandler_Subscribe_CallsPubSub(t *testing.T) {
+	secret := "test-secret"
+	h := NewWebSocketHandler(nil, nil, secret)
+	mp := &mockPubSub{}
+	h.SetPubSub(mp)
+
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	token := makeTestJWT(t, secret, "user-123", "user@example.com")
+	wsURL := "ws" + srv.URL[len("http"):] + "/ws?token=" + token
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	// consume connected ack
+	_, _, err = conn.ReadMessage()
+	require.NoError(t, err)
+
+	err = conn.WriteJSON(map[string]string{
+		"type":       "subscribe",
+		"channel_id": "ch-1",
+	})
+	require.NoError(t, err)
+
+	_, data, err := conn.ReadMessage()
+	require.NoError(t, err)
+	var msg map[string]string
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "subscribed", msg["type"])
+	assert.Equal(t, "ch-1", msg["channel_id"])
+	require.Len(t, mp.subscribed, 1)
+	assert.Equal(t, "channel:ch-1", mp.subscribed[0])
+}
+
+func TestWebSocketHandler_SendMessage_PublishesToPubSub(t *testing.T) {
+	secret := "test-secret"
+	h := NewWebSocketHandler(nil, nil, secret)
+	mp := &mockPubSub{}
+	h.SetPubSub(mp)
+
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	token := makeTestJWT(t, secret, "user-123", "user@example.com")
+	wsURL := "ws" + srv.URL[len("http"):] + "/ws?token=" + token
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	_, _, err = conn.ReadMessage() // connected ack
+	require.NoError(t, err)
+
+	err = conn.WriteJSON(map[string]string{
+		"type":       "send_message",
+		"channel_id": "ch-1",
+		"text":       "hello",
+	})
+	require.NoError(t, err)
+
+	_, data, err := conn.ReadMessage()
+	require.NoError(t, err)
+	var msg map[string]string
+	require.NoError(t, json.Unmarshal(data, &msg))
+	assert.Equal(t, "message_sent", msg["type"])
+
+	assert.Equal(t, "channel:ch-1", mp.publishedChannel)
+	assert.Contains(t, mp.publishedMessage, "hello")
 }
 
 func makeTestJWT(t *testing.T, secret, userID, email string) string {
