@@ -46,6 +46,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	agentRepo := repository.NewAgentRepository(db)
 	apiKeyRepo := repository.NewAPIKeyRepository(db)
 	webhookRepo := repository.NewWebhookRepository(db)
+	inviteRepo := repository.NewInviteRepository(db)
 
 	// Initialize services
 	authService := service.NewAuthService(userRepo, jwtSecret)
@@ -54,6 +55,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	agentService := service.NewAgentService(agentRepo)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, agentRepo)
 	webhookService := service.NewWebhookService(webhookRepo, agentRepo)
+	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, jwtSecret, "http://localhost:8080")
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
@@ -62,6 +64,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	agentHandler := handlers.NewAgentHandler(agentService)
 	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyService)
 	webhookHandler := handlers.NewWebhookHandler(webhookService)
+	bootstrapHandler := handlers.NewBootstrapHandler(bootstrapService)
 	
 	// Initialize WebSocket hub and handler
 	hub := handlers.NewHub()
@@ -69,6 +72,9 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 
 	// WebSocket endpoint (query param auth, not middleware)
 	r.Handle("/ws", wsHandler)
+
+	// Bootstrap route (public, only works on fresh instance)
+	r.Post("/api/v1/bootstrap", bootstrapHandler.ServeHTTP)
 
 	// Authentication routes (public)
 	r.Route("/api/v1/auth", func(r chi.Router) {

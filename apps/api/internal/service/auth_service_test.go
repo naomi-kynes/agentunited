@@ -38,6 +38,11 @@ func (m *MockUserRepository) GetByID(ctx context.Context, id string) (*models.Us
 	return args.Get(0).(*models.User), args.Error(1)
 }
 
+func (m *MockUserRepository) Count(ctx context.Context) (int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(int64), args.Error(1)
+}
+
 // Test: Register with valid input should create user
 func TestAuthService_Register_ValidInput(t *testing.T) {
 	mockRepo := new(MockUserRepository)

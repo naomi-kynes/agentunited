@@ -43,4 +43,16 @@ var (
 
 	// ErrInvalidMessageText indicates message text is invalid (empty or too long)
 	ErrInvalidMessageText = errors.New("message text must be between 1 and 10,000 characters")
+
+	// ErrInviteNotFound indicates invite token does not exist or is invalid
+	ErrInviteNotFound = errors.New("invite not found")
+
+	// ErrInviteExpired indicates invite token has expired
+	ErrInviteExpired = errors.New("invite has expired")
+
+	// ErrInviteAlreadyConsumed indicates invite token has already been used
+	ErrInviteAlreadyConsumed = errors.New("invite has already been consumed")
+
+	// ErrInstanceAlreadyBootstrapped indicates bootstrap has already been completed
+	ErrInstanceAlreadyBootstrapped = errors.New("instance has already been bootstrapped")
 )

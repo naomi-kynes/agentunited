@@ -15,6 +15,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *models.User) error
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
 	GetByID(ctx context.Context, id string) (*models.User, error)
+	Count(ctx context.Context) (int64, error)
 }
 
 // PostgresUserRepository implements UserRepository with PostgreSQL
@@ -108,4 +109,17 @@ func (r *PostgresUserRepository) GetByID(ctx context.Context, id string) (*model
 	}
 
 	return &user, nil
+}
+
+// Count returns the total number of users
+func (r *PostgresUserRepository) Count(ctx context.Context) (int64, error) {
+	query := `SELECT COUNT(*) FROM users`
+	
+	var count int64
+	err := r.db.Pool.QueryRow(ctx, query).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("count users: %w", err)
+	}
+	
+	return count, nil
 }
