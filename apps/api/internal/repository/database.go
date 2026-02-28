@@ -3,11 +3,11 @@ package repository
 import (
 	"context"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	"github.com/agentunited/backend/internal/config"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
+	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog/log"
 )
 
@@ -45,33 +45,27 @@ func (db *DB) Close() {
 	log.Info().Msg("database connection closed")
 }
 
-// RunMigrations executes SQL migration files from the migrations directory
+// RunMigrations executes SQL migration files using goose
 func (db *DB) RunMigrations(ctx context.Context, migrationsDir string) error {
-	files, err := filepath.Glob(filepath.Join(migrationsDir, "*.sql"))
+	// Get a *sql.DB from the pgx pool for goose compatibility
+	sqlDB := stdlib.OpenDBFromPool(db.Pool)
+
+	goose.SetLogger(goose.NopLogger())
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		return fmt.Errorf("set goose dialect: %w", err)
+	}
+
+	if err := goose.UpContext(ctx, sqlDB, migrationsDir); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
+	}
+
+	version, err := goose.GetDBVersionContext(ctx, sqlDB)
 	if err != nil {
-		return fmt.Errorf("read migrations directory: %w", err)
+		return fmt.Errorf("get migration version: %w", err)
 	}
 
-	if len(files) == 0 {
-		log.Warn().Str("dir", migrationsDir).Msg("no migration files found")
-		return nil
-	}
-
-	for _, file := range files {
-		log.Info().Str("file", filepath.Base(file)).Msg("running migration")
-
-		content, err := os.ReadFile(file)
-		if err != nil {
-			return fmt.Errorf("read migration %s: %w", file, err)
-		}
-
-		// Execute migration
-		if _, err := db.Pool.Exec(ctx, string(content)); err != nil {
-			return fmt.Errorf("execute migration %s: %w", file, err)
-		}
-	}
-
-	log.Info().Int("count", len(files)).Msg("migrations complete")
+	log.Info().Int64("version", version).Str("dir", migrationsDir).Msg("migrations complete")
 	return nil
 }
 

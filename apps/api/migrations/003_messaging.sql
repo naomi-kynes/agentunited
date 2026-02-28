@@ -1,10 +1,5 @@
--- Messaging infrastructure (channels + channel_members)
-
--- Drop old channels table from migration 001 (was SERIAL, now UUID)
-DROP TABLE IF EXISTS channels CASCADE;
-
--- Channels table (recreated with UUID)
-CREATE TABLE channels (
+-- +goose Up
+CREATE TABLE IF NOT EXISTS channels (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL UNIQUE,
     topic TEXT,
@@ -13,7 +8,6 @@ CREATE TABLE channels (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Channel members table (many-to-many relationship)
 CREATE TABLE IF NOT EXISTS channel_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -23,18 +17,15 @@ CREATE TABLE IF NOT EXISTS channel_members (
     CONSTRAINT uq_channel_user UNIQUE (channel_id, user_id)
 );
 
--- Trigger for auto-updating updated_at on channels
 CREATE TRIGGER update_channels_updated_at
     BEFORE UPDATE ON channels
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
 CREATE INDEX IF NOT EXISTS idx_channel_members_channel ON channel_members(channel_id);
 CREATE INDEX IF NOT EXISTS idx_channel_members_user ON channel_members(user_id);
 
--- Messages table
 CREATE TABLE IF NOT EXISTS messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
@@ -45,5 +36,9 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT chk_text_length CHECK (LENGTH(text) > 0 AND LENGTH(text) <= 10000)
 );
 
--- Index for message queries (channel + time-based pagination)
 CREATE INDEX IF NOT EXISTS idx_messages_channel ON messages(channel_id, created_at DESC);
+
+-- +goose Down
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS channel_members;
+DROP TABLE IF EXISTS channels;
