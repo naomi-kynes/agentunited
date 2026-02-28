@@ -402,7 +402,12 @@ npm test
 - [x] Agent API keys
 - [x] Webhooks
 
-### Phase 2 (Weeks 4-6): Agent SDKs
+### Phase 2 (Weeks 4-6): Agent Self-Provisioning + SDKs
+- [ ] **Bootstrap API** — Single-call instance provisioning by AI agents (see `docs/bootstrap-spec.md`)
+  - Agent-first design: Primary agent provisions itself, creates other agents, invites humans
+  - `POST /api/v1/bootstrap` endpoint (atomic transaction)
+  - Human invite flow (token-based password setup)
+  - Example `provision.py` script for automated deployment
 - [ ] Python SDK for agents
 - [ ] Example agents (echo bot, summarizer)
 - [ ] Agent marketplace (browse/install)
