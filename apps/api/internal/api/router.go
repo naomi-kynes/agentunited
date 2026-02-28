@@ -75,21 +75,19 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	// WebSocket endpoint (query param auth, not middleware)
 	r.Handle("/ws", wsHandler)
 
-	// Bootstrap route (public, only works on fresh instance)
+	// Public routes (no authentication required)
 	r.Post("/api/v1/bootstrap", bootstrapHandler.ServeHTTP)
-
-	// Invite routes (public)
 	r.Get("/api/v1/invite", inviteHandler.ValidateInvite)
 	r.Post("/api/v1/invite/accept", inviteHandler.AcceptInvite)
-
-	// Authentication routes (public)
+	
+	// Public authentication routes
 	r.Route("/api/v1/auth", func(r chi.Router) {
 		r.Post("/register", authHandler.Register)
 		r.Post("/login", authHandler.Login)
 	})
-
-	// Protected routes helper (shared between /api/v1 and /v1 for backwards compat)
-	protectedRoutes := func(r chi.Router) {
+	
+	// Protected API v1 routes (require JWT authentication)
+	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.JWTAuth(jwtSecret))
 		
 		// Agent routes
@@ -122,11 +120,43 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 			r.Post("/{channel_id}/messages", messageHandler.Send)
 			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
 		})
-	}
+	})
 
-	// Mount protected routes on both /api/v1 and /v1 (backwards compat)
-	r.Route("/api/v1", protectedRoutes)
-	r.Route("/v1", protectedRoutes)
+	// Backward compatibility: Mount protected routes on /v1 as well
+	r.Route("/v1", func(r chi.Router) {
+		r.Use(mw.JWTAuth(jwtSecret))
+		
+		// Agent routes
+		r.Route("/agents", func(r chi.Router) {
+			r.Post("/", agentHandler.Create)
+			r.Get("/", agentHandler.List)
+			r.Get("/{id}", agentHandler.Get)
+			r.Patch("/{id}", agentHandler.Update)
+			r.Delete("/{id}", agentHandler.Delete)
+			
+			// API key routes (nested under agents)
+			r.Post("/{agent_id}/keys", apiKeyHandler.Create)
+			r.Get("/{agent_id}/keys", apiKeyHandler.List)
+			r.Delete("/{agent_id}/keys/{key_id}", apiKeyHandler.Delete)
+			
+			// Webhook routes (nested under agents)
+			r.Post("/{agent_id}/webhooks", webhookHandler.Create)
+			r.Get("/{agent_id}/webhooks", webhookHandler.List)
+			r.Delete("/{agent_id}/webhooks/{webhook_id}", webhookHandler.Delete)
+			r.Get("/{agent_id}/webhooks/{webhook_id}/deliveries", webhookHandler.ListDeliveries)
+		})
+		
+		// Channel routes
+		r.Route("/channels", func(r chi.Router) {
+			r.Post("/", channelHandler.Create)
+			r.Get("/", channelHandler.List)
+			r.Get("/{id}", channelHandler.Get)
+			
+			// Message routes (nested under channels)
+			r.Post("/{channel_id}/messages", messageHandler.Send)
+			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
+		})
+	})
 
 	return r
 }
