@@ -1,41 +1,44 @@
 import { useState, useEffect } from 'react';
-import { ChannelSidebar } from '../components/chat/ChannelSidebar';
+import { ChatSidebar } from '../components/chat/ChatSidebar';
 import { ChatHeader } from '../components/chat/ChatHeader';
 import { MessageList } from '../components/chat/MessageList';
 import { MessageInput } from '../components/chat/MessageInput';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { fetchChannels } from '../services/api';
+import { chatApi } from '../services/chatApi';
 import type { Channel } from '../types/chat';
 
 export function ChatPage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [channels, setChannels] = useState<Channel[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
+  const [channelsLoading, setChannelsLoading] = useState(true);
+  const [channelsError, setChannelsError] = useState<string | null>(null);
+  
+  const { messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', selectedChannelId);
 
-  // Load channels from API
+  // Load channels on component mount
   useEffect(() => {
-    let cancelled = false;
-
-    async function loadChannels() {
+    const loadChannels = async () => {
       try {
-        const chs = await fetchChannels();
-        if (!cancelled && chs.length > 0) {
-          setChannels(chs);
-          setSelectedChannelId(prev => prev || chs[0].id);
+        setChannelsLoading(true);
+        setChannelsError(null);
+        
+        const fetchedChannels = await chatApi.getChannels();
+        setChannels(fetchedChannels);
+        
+        // Auto-select first channel if none selected
+        if (fetchedChannels.length > 0 && !selectedChannelId) {
+          setSelectedChannelId(fetchedChannels[0].id);
         }
-      } catch (err) {
-        console.error('Failed to load channels:', err);
+      } catch (error) {
+        console.error('Failed to load channels:', error);
+        setChannelsError(error instanceof Error ? error.message : 'Failed to load channels');
+      } finally {
+        setChannelsLoading(false);
       }
-    }
+    };
 
     loadChannels();
-    return () => { cancelled = true; };
-  }, []);
-
-  const { isConnected, messages, sendMessage } = useWebSocket(
-    'ws://localhost:8080/ws',
-    selectedChannelId
-  );
+  }, [selectedChannelId]);
 
   const selectedChannel = channels.find(ch => ch.id === selectedChannelId) || null;
 
@@ -47,36 +50,98 @@ export function ChatPage() {
     setSelectedChannelId(channelId);
   };
 
-  if (channels.length === 0) {
+  const handleDMSelect = (dmId: string) => {
+    // TODO: Handle direct message selection
+    console.log('Selected DM:', dmId);
+  };
+
+  // Show loading state while channels are loading
+  if (channelsLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Loading channels...</p>
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="text-lg font-medium text-foreground mb-2">Loading channels...</div>
+          <div className="text-sm text-muted-foreground">Connecting to Agent United</div>
+        </div>
       </div>
     );
   }
 
+  // Show error state if channels failed to load
+  if (channelsError) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-lg font-medium text-destructive mb-2">Failed to load channels</div>
+          <div className="text-sm text-destructive-foreground mb-4">{channelsError}</div>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show empty state if no channels
+  if (channels.length === 0) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-lg font-medium text-foreground mb-2">No channels available</div>
+          <div className="text-sm text-muted-foreground">Contact an agent to get access to channels</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Mock direct messages for now (TODO: Fetch from API)
+  const directMessages = [
+    {
+      id: 'dm-1',
+      name: 'Agent Alpha',
+      type: 'agent' as const,
+      online: true,
+      unread: 2
+    },
+    {
+      id: 'dm-2', 
+      name: 'John Smith',
+      type: 'human' as const,
+      online: false,
+      unread: 0
+    }
+  ];
+
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
-      <ChannelSidebar
+    <div className="h-screen flex overflow-hidden bg-background">
+      <ChatSidebar
         channels={channels}
-        selectedChannel={selectedChannelId}
-        onSelectChannel={handleSelectChannel}
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
+        directMessages={directMessages}
+        activeChannelId={selectedChannelId}
+        onChannelSelect={handleSelectChannel}
+        onDMSelect={handleDMSelect}
       />
 
       <div className="flex-1 flex flex-col">
         <ChatHeader
-          channel={selectedChannel}
-          isConnected={isConnected}
-          onMenuClick={() => setIsSidebarOpen(true)}
+          channelName={selectedChannel?.name || 'unknown'}
+          topic={selectedChannel?.topic}
         />
 
         <MessageList messages={messages} />
 
+        {wsError && (
+          <div className="px-4 py-2 bg-destructive/10 border-t border-destructive/20">
+            <div className="text-sm text-destructive">{wsError}</div>
+          </div>
+        )}
+
         <MessageInput
           onSend={handleSendMessage}
-          disabled={!isConnected}
+          placeholder={`Message #${selectedChannel?.name || 'general'}`}
         />
       </div>
     </div>
