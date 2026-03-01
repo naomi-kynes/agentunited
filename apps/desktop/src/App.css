@@ -64,3 +64,168 @@
   flex-direction: column;
   min-width: 0; /* Allow content to shrink */
 }
+
+/* App sections for semantic HTML */
+.app-sidebar {
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.app-main {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Loading Screen */
+.app--loading {
+  align-items: center;
+  justify-content: center;
+}
+
+.app-loading-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-8);
+  text-align: center;
+  animation: fadeIn var(--duration-slower) var(--ease-out);
+}
+
+.loading-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.loading-icon {
+  width: 120px;
+  height: 120px;
+  background: linear-gradient(135deg, var(--color-rust), var(--color-amber-warm));
+  border-radius: var(--radius-xl);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  box-shadow: var(--shadow-xl);
+  animation: pulse 2s infinite;
+}
+
+.loading-text {
+  font-family: var(--font-display);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-2xl);
+  color: var(--color-text-primary);
+  letter-spacing: 0.05em;
+}
+
+.loading-message {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  margin: 0;
+  font-style: italic;
+}
+
+/* Skip Link for Accessibility */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--color-rust);
+  color: var(--color-text-primary);
+  padding: 8px;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  font-weight: var(--weight-medium);
+  z-index: 10000;
+  transition: top var(--duration-fast) var(--ease-out);
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Screen reader only class */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Animations for polish */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+/* High contrast support */
+@media (prefers-contrast: high) {
+  .app {
+    border: 1px solid var(--color-text-primary);
+  }
+  
+  .loading-icon {
+    border: 2px solid var(--color-text-primary);
+  }
+  
+  .skip-link {
+    border: 2px solid var(--color-text-primary);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-screen {
+    animation: none;
+  }
+  
+  .loading-icon {
+    animation: none;
+  }
+  
+  .skip-link {
+    transition: none;
+  }
+}
+
+/* Focus management */
+.app {
+  position: relative;
+}
+
+/* Print styles */
+@media print {
+  .app {
+    background: white;
+    color: black;
+  }
+  
+  .skip-link,
+  .app-loading-screen {
+    display: none;
+  }
+}

@@ -4,15 +4,20 @@ import MainContent from './components/MainContent';
 import TitleBar from './components/TitleBar';
 import { InviteWindow, SettingsWindow } from './screens';
 import { CommandPalette, useCommandPalette } from './components/CommandPalette';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { LoadingSpinner } from './components/LoadingStates';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useNativeIntegration, useMenuAction } from './hooks/useNativeIntegration';
+import { initializeAccessibility, ScreenReader } from './utils/accessibility';
 import './App.css';
+import './styles/animations.css';
 
 function App() {
   const [sidebarWidth, setSidebarWidth] = useState(240);
   const [showInviteWindow, setShowInviteWindow] = useState(false);
   const [showSettingsWindow, setShowSettingsWindow] = useState(false);
   const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [appInitialized, setAppInitialized] = useState(false);
   
   // WebSocket hook for global state management
   const webSocketHook = useWebSocket({
@@ -127,6 +132,28 @@ function App() {
     const totalUnread = channels.reduce((sum, channel) => sum + (channel.unreadCount || 0), 0);
     updateDockBadge(totalUnread);
   }, [channels, isElectron, updateDockBadge]);
+
+  // Initialize accessibility and app
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        // Initialize accessibility features
+        initializeAccessibility();
+        
+        // Announce app ready to screen readers
+        setTimeout(() => {
+          ScreenReader.announce('Agent United is ready', 'polite');
+        }, 1000);
+
+        setAppInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+        setAppInitialized(true); // Still show app even if initialization fails
+      }
+    };
+
+    initializeApp();
+  }, []);
 
   // Clear dock badge when app becomes active
   useEffect(() => {
@@ -253,60 +280,123 @@ function App() {
     return () => document.removeEventListener('keydown', handleGlobalKeyDown);
   }, [openCommandPalette, channels]);
 
-  return (
-    <div className="app">
-      <TitleBar />
-      
-      <div className="app-body">
-        {sidebarVisible && (
-          <Sidebar 
-            width={sidebarWidth} 
-            onWidthChange={setSidebarWidth}
-            webSocketHook={webSocketHook}
-            onChannelSelect={handleChannelSelect}
-            onSettingsOpen={handleSettingsOpen}
-            onCommandPaletteOpen={openCommandPalette}
-          />
-        )}
-        
-        <MainContent 
-          currentChannel={activeChannel || 'general'}
-          webSocketHook={webSocketHook}
-          sidebarVisible={sidebarVisible}
-        />
+  // Show loading screen while initializing
+  if (!appInitialized) {
+    return (
+      <div className="app app--loading">
+        <div className="app-loading-screen">
+          <div className="loading-logo">
+            <span className="loading-icon">🤖</span>
+            <div className="loading-text">AGENT UNITED</div>
+          </div>
+          <div className="loading-spinner">
+            <LoadingSpinner size="lg" />
+          </div>
+          <p className="loading-message">Initializing workspace...</p>
+        </div>
       </div>
+    );
+  }
 
-      {/* Command Palette */}
-      <CommandPalette
-        isOpen={commandPaletteOpen}
-        onClose={closeCommandPalette}
-        channels={channels}
-        users={users}
-        onChannelSelect={handleChannelSelect}
-        onUserSelect={handleUserSelect}
-        onSettingsOpen={handleSettingsOpen}
-        onNewChannel={handleNewChannel}
-        onNewDM={handleNewDM}
-      />
+  return (
+    <ErrorBoundary level="app" onError={(error) => {
+      console.error('App-level error:', error);
+      ScreenReader.announceError('Application error occurred');
+    }}>
+      <div className="app" role="application" aria-label="Agent United">
+        <ErrorBoundary level="component">
+          <TitleBar />
+        </ErrorBoundary>
+        
+        <div className="app-body">
+          {sidebarVisible && (
+            <ErrorBoundary level="component">
+              <aside className="app-sidebar" aria-label="Navigation sidebar">
+                <Sidebar 
+                  width={sidebarWidth} 
+                  onWidthChange={setSidebarWidth}
+                  webSocketHook={webSocketHook}
+                  onChannelSelect={handleChannelSelect}
+                  onSettingsOpen={handleSettingsOpen}
+                  onCommandPaletteOpen={openCommandPalette}
+                />
+              </aside>
+            </ErrorBoundary>
+          )}
+          
+          <ErrorBoundary level="component">
+            <main className="app-main" aria-label="Main content">
+              <MainContent 
+                currentChannel={activeChannel || 'general'}
+                webSocketHook={webSocketHook}
+                sidebarVisible={sidebarVisible}
+              />
+            </main>
+          </ErrorBoundary>
+        </div>
 
-      {/* Modal Windows */}
-      {showInviteWindow && (
-        <InviteWindow
-          token="example_token"
-          onSuccess={() => setShowInviteWindow(false)}
-          onError={(error) => {
-            console.error('Invite error:', error);
-            setShowInviteWindow(false);
-          }}
+        {/* Command Palette */}
+        <ErrorBoundary level="feature">
+          <CommandPalette
+            isOpen={commandPaletteOpen}
+            onClose={closeCommandPalette}
+            channels={channels}
+            users={users}
+            onChannelSelect={handleChannelSelect}
+            onUserSelect={handleUserSelect}
+            onSettingsOpen={handleSettingsOpen}
+            onNewChannel={handleNewChannel}
+            onNewDM={handleNewDM}
+          />
+        </ErrorBoundary>
+
+        {/* Modal Windows */}
+        {showInviteWindow && (
+          <ErrorBoundary level="component">
+            <div role="dialog" aria-modal="true" aria-labelledby="invite-dialog-title">
+              <InviteWindow
+                token="example_token"
+                onSuccess={() => {
+                  setShowInviteWindow(false);
+                  ScreenReader.announce('Successfully joined workspace');
+                }}
+                onError={(error) => {
+                  console.error('Invite error:', error);
+                  setShowInviteWindow(false);
+                  ScreenReader.announceError('Failed to join workspace');
+                }}
+              />
+            </div>
+          </ErrorBoundary>
+        )}
+
+        {showSettingsWindow && (
+          <ErrorBoundary level="component">
+            <div role="dialog" aria-modal="true" aria-labelledby="settings-dialog-title">
+              <SettingsWindow
+                onClose={() => {
+                  setShowSettingsWindow(false);
+                  ScreenReader.announce('Settings closed');
+                }}
+              />
+            </div>
+          </ErrorBoundary>
+        )}
+
+        {/* Accessibility live region for announcements */}
+        <div
+          id="aria-live-region"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
         />
-      )}
-
-      {showSettingsWindow && (
-        <SettingsWindow
-          onClose={() => setShowSettingsWindow(false)}
-        />
-      )}
-    </div>
+        
+        {/* Skip navigation link for keyboard users */}
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
+      </div>
+    </ErrorBoundary>
   );
 }
 
