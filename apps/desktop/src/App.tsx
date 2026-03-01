@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import MainContent from './components/MainContent';
 import TitleBar from './components/TitleBar';
+import { InviteWindow, SettingsWindow } from './screens';
 import './App.css';
 
 function App() {

@@ -127,7 +127,7 @@ export function Message({
         <div className="message__body">
           {message.mentions && message.mentions.length > 0 ? (
             <div 
-              dangerouslySetInnerHTML={renderMentions(message.content, message.mentions)}
+              dangerouslySetInnerHTML={renderMentions(message.content, message.mentions) as { __html: string }}
             />
           ) : (
             <p>{message.content}</p>

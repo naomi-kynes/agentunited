@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { ChannelListItem, Input, Button } from './ui';
 import type { ChannelData } from './ui';
+import { NoChannelsState, NoDirectMessagesState } from './EmptyStates';
 import '../styles/sidebar.css';
 
 interface SidebarProps {

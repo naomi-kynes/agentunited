@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Message, Button, Input } from './ui';
 import type { MessageData } from './ui';
+import { NoMessagesState } from './EmptyStates';
 import '../styles/main-content.css';
 
 function MainContent() {

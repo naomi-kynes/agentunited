@@ -1,0 +1,189 @@
+/* Empty States styles */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-10);
+  min-height: 300px;
+  color: var(--color-text-secondary);
+}
+
+.empty-state__illustration {
+  margin-bottom: var(--space-6);
+  opacity: 0.7;
+}
+
+.illustration-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  background-color: var(--color-bg-tertiary);
+  border-radius: var(--radius-xl);
+  margin: 0 auto;
+}
+
+.empty-state__content {
+  max-width: 400px;
+}
+
+.empty-state__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-3);
+  line-height: var(--leading-tight);
+}
+
+.empty-state__description {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  line-height: var(--leading-relaxed);
+  margin: 0 0 var(--space-6);
+}
+
+.empty-state__action {
+  margin-top: var(--space-6);
+}
+
+/* Specific empty state variants */
+.no-channels {
+  /* Specific styling for no channels state */
+}
+
+.no-messages {
+  /* Specific styling for no messages state */
+}
+
+.no-messages .empty-state__title {
+  color: var(--color-rust);
+}
+
+.no-search-results {
+  /* Specific styling for no search results */
+}
+
+.no-search-results .empty-state__description {
+  font-style: italic;
+}
+
+.no-dms {
+  /* Specific styling for no DMs state */
+}
+
+.offline-state {
+  /* Specific styling for offline state */
+}
+
+.offline-state .empty-state__title {
+  color: var(--color-danger);
+}
+
+.offline-state .illustration-icon {
+  background-color: rgba(196, 101, 95, 0.1);
+}
+
+/* Loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-10);
+  min-height: 200px;
+  gap: var(--space-4);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-bg-tertiary);
+  border-top: 3px solid var(--color-rust);
+  border-radius: var(--radius-full);
+  animation: spin 1s linear infinite;
+}
+
+.loading-message {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.empty-state {
+  animation: fadeIn var(--duration-normal) var(--ease-out);
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .empty-state {
+    padding: var(--space-8) var(--space-4);
+    min-height: 250px;
+  }
+  
+  .empty-state__title {
+    font-size: var(--text-lg);
+  }
+  
+  .empty-state__description {
+    font-size: var(--text-sm);
+  }
+  
+  .illustration-icon {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .illustration-icon span {
+    font-size: 36px !important;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .loading-spinner {
+    animation: none;
+    border-top-color: var(--color-rust);
+  }
+  
+  .empty-state {
+    animation: none;
+  }
+}
+
+/* Dark mode specific adjustments */
+.empty-state__illustration {
+  filter: grayscale(0.3);
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .empty-state__title {
+    color: var(--color-text-primary);
+  }
+  
+  .illustration-icon {
+    border: 1px solid var(--color-border);
+  }
+}
