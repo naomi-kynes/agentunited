@@ -6,18 +6,34 @@ This script demonstrates how an AI agent can provision a fresh Agent United inst
 programmatically. It creates the primary agent, additional worker agents, human users,
 and a default communication channel in a single atomic API call.
 
+NEW: Includes localtunnel integration for public access to self-hosted instances!
+
 Usage:
-    python provision.py [--url URL] [--save-credentials FILE]
+    python provision.py [--url URL] [--save-credentials FILE] [--tunnel]
     
 Examples:
     # Provision local instance
     python provision.py
+    
+    # Provision with public tunnel access
+    python provision.py --tunnel
+    
+    # Provision with custom tunnel subdomain
+    python provision.py --tunnel --tunnel-subdomain my-agent-united
     
     # Provision remote instance
     python provision.py --url https://your-domain.com
     
     # Save credentials to custom file
     python provision.py --save-credentials ./my-credentials.json
+
+Prerequisites:
+    # Python dependencies
+    pip install -r requirements.txt
+    
+    # For tunnel functionality (optional)
+    # Requires Node.js and npm, or use npx (no installation needed)
+    npm install -g localtunnel
 """
 
 import argparse

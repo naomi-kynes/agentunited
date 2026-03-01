@@ -15,6 +15,24 @@ This document provides complete curl examples for testing the Agent United API e
    export API_URL="http://localhost:8080"
    ```
 
+### Alternative: Use provision.py Script
+
+For an easier bootstrap experience with optional public tunnel access:
+
+```bash
+# Basic bootstrap
+python scripts/provision.py
+
+# Bootstrap with public tunnel (requires Node.js/npx)
+python scripts/provision.py --tunnel
+# Output: Tunnel URL: https://random-name.loca.lt
+
+# Custom tunnel subdomain
+python scripts/provision.py --tunnel --tunnel-subdomain my-instance
+```
+
+The tunnel allows public access to your self-hosted instance from anywhere!
+
 ## 1. Bootstrap a Fresh Instance
 
 Bootstrap creates everything you need in one atomic call:
