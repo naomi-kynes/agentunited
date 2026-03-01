@@ -2,10 +2,13 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/agentunited/backend/internal/models"
+	"github.com/agentunited/backend/internal/repository"
 	"github.com/agentunited/backend/internal/service"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rs/zerolog/log"
@@ -19,7 +22,57 @@ const (
 	UserIDKey contextKey = "user_id"
 )
 
-// JWTAuth creates a JWT authentication middleware
+// Auth creates an authentication middleware that supports both JWT tokens and API keys
+func Auth(jwtSecret string, apiKeyRepo repository.APIKeyRepository, agentRepo repository.AgentRepository) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Get token from Authorization header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				respondUnauthorized(w, "Missing authorization header")
+				return
+			}
+
+			// Check for Bearer token format
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				respondUnauthorized(w, "Invalid authorization header format")
+				return
+			}
+
+			tokenString := parts[1]
+			var userID string
+			var err error
+
+			// Check if this is an API key (starts with au_) or JWT token
+			if strings.HasPrefix(tokenString, "au_") {
+				// API Key authentication
+				userID, err = authenticateAPIKey(r.Context(), tokenString, apiKeyRepo, agentRepo)
+				if err != nil {
+					log.Error().Err(err).Str("key_prefix", tokenString[:10]+"...").Msg("invalid API key")
+					respondUnauthorized(w, "Invalid or expired API key")
+					return
+				}
+			} else {
+				// JWT token authentication
+				userID, err = authenticateJWT(tokenString, jwtSecret)
+				if err != nil {
+					log.Error().Err(err).Msg("invalid JWT token")
+					respondUnauthorized(w, "Invalid or expired token")
+					return
+				}
+			}
+
+			// Add user ID to context
+			ctx := context.WithValue(r.Context(), UserIDKey, userID)
+
+			// Call next handler
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// JWTAuth creates a JWT-only authentication middleware (backward compatibility)
 func JWTAuth(jwtSecret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,35 +92,71 @@ func JWTAuth(jwtSecret string) func(http.Handler) http.Handler {
 
 			tokenString := parts[1]
 
-			// Parse and validate token
-			token, err := jwt.ParseWithClaims(tokenString, &service.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
-				// Verify signing method
-				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, models.ErrInvalidToken
-				}
-				return []byte(jwtSecret), nil
-			})
-
-			if err != nil || !token.Valid {
+			// JWT token authentication only
+			userID, err := authenticateJWT(tokenString, jwtSecret)
+			if err != nil {
 				log.Error().Err(err).Msg("invalid JWT token")
 				respondUnauthorized(w, "Invalid or expired token")
 				return
 			}
 
-			// Extract claims
-			claims, ok := token.Claims.(*service.JWTClaims)
-			if !ok {
-				respondUnauthorized(w, "Invalid token claims")
-				return
-			}
-
 			// Add user ID to context
-			ctx := context.WithValue(r.Context(), UserIDKey, claims.UserID)
+			ctx := context.WithValue(r.Context(), UserIDKey, userID)
 
 			// Call next handler
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// authenticateJWT validates a JWT token and returns the user ID
+func authenticateJWT(tokenString, jwtSecret string) (string, error) {
+	// Parse and validate token
+	token, err := jwt.ParseWithClaims(tokenString, &service.JWTClaims{}, func(token *jwt.Token) (interface{}, error) {
+		// Verify signing method
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, models.ErrInvalidToken
+		}
+		return []byte(jwtSecret), nil
+	})
+
+	if err != nil || !token.Valid {
+		return "", err
+	}
+
+	// Extract claims
+	claims, ok := token.Claims.(*service.JWTClaims)
+	if !ok {
+		return "", models.ErrInvalidToken
+	}
+
+	return claims.UserID, nil
+}
+
+// authenticateAPIKey validates an API key and returns the user ID
+func authenticateAPIKey(ctx context.Context, apiKey string, apiKeyRepo repository.APIKeyRepository, agentRepo repository.AgentRepository) (string, error) {
+	// Hash the provided API key
+	keyHash := hashAPIKey(apiKey)
+	
+	// Look up the API key in the database
+	key, err := apiKeyRepo.GetByHash(ctx, keyHash)
+	if err != nil {
+		return "", err
+	}
+
+	// Get the agent to find the owner (user)
+	agent, err := agentRepo.Get(ctx, key.AgentID)
+	if err != nil {
+		return "", err
+	}
+
+	return agent.OwnerID, nil
+}
+
+// hashAPIKey hashes an API key using SHA-256
+func hashAPIKey(key string) string {
+	hash := sha256.Sum256([]byte(key))
+	return fmt.Sprintf("%x", hash)
 }
 
 // respondUnauthorized sends a 401 response
