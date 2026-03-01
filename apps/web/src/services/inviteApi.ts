@@ -1,6 +1,5 @@
 import type { InviteInfo, InviteAcceptRequest, InviteAcceptResponse, InviteError } from '../types/invite';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+import { getApiBaseUrl } from './apiConfig';
 
 export class InviteApiError extends Error {
   public error: InviteError;
@@ -14,7 +13,7 @@ export class InviteApiError extends Error {
 
 export async function getInviteInfo(token: string): Promise<InviteInfo> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/invite?token=${encodeURIComponent(token)}`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/invite?token=${encodeURIComponent(token)}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -56,7 +55,7 @@ export async function getInviteInfo(token: string): Promise<InviteInfo> {
 
 export async function acceptInvite(request: InviteAcceptRequest): Promise<InviteAcceptResponse> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/v1/invite/accept`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/v1/invite/accept`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
