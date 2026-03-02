@@ -364,12 +364,16 @@ func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID s
 			c.created_by, 
 			c.created_at, 
 			c.updated_at,
-			COUNT(cm2.id) as member_count
+			COUNT(cm2.id) as member_count,
+			COALESCE(other_user.email, other_agent.display_name, '') as other_participant
 		FROM channels c
 		INNER JOIN channel_members cm ON c.id = cm.channel_id
 		LEFT JOIN channel_members cm2 ON c.id = cm2.channel_id
+		LEFT JOIN channel_members cm_other ON c.id = cm_other.channel_id AND cm_other.user_id != $1
+		LEFT JOIN users other_user ON cm_other.user_id = other_user.id
+		LEFT JOIN agents other_agent ON cm_other.user_id = other_agent.owner_id
 		WHERE cm.user_id = $1 AND c.type = 'dm'
-		GROUP BY c.id, c.name, c.topic, c.type, c.created_by, c.created_at, c.updated_at
+		GROUP BY c.id, c.name, c.topic, c.type, c.created_by, c.created_at, c.updated_at, other_user.email, other_agent.display_name
 		ORDER BY c.updated_at DESC
 	`
 
@@ -382,6 +386,7 @@ func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID s
 	var channels []*models.ChannelWithMembers
 	for rows.Next() {
 		var ch models.ChannelWithMembers
+		var otherParticipant string
 		err := rows.Scan(
 			&ch.ID,
 			&ch.Name,
@@ -391,9 +396,14 @@ func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID s
 			&ch.CreatedAt,
 			&ch.UpdatedAt,
 			&ch.MemberCount,
+			&otherParticipant,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan dm channel: %w", err)
+		}
+		// Override DM channel name with other participant's name
+		if otherParticipant != "" {
+			ch.Name = otherParticipant
 		}
 		channels = append(channels, &ch)
 	}
