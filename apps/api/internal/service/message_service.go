@@ -20,6 +20,9 @@ type MessageService interface {
 	Send(ctx context.Context, channelID, userID, text string) (*models.Message, error)
 	SendAsAgent(ctx context.Context, channelID, ownerID string, agent AgentContext, text string) (*models.Message, error)
 	GetMessages(ctx context.Context, channelID, userID string, limit int, before string) (*models.MessageList, error)
+	EditMessage(ctx context.Context, messageID, userID, text string) (*models.Message, error)
+	DeleteMessage(ctx context.Context, messageID, userID string) error
+	SearchMessages(ctx context.Context, query, channelID, userID string, limit int) ([]*models.Message, error)
 }
 
 // messageService implements MessageService
@@ -127,6 +130,116 @@ func (s *messageService) GetMessages(ctx context.Context, channelID, userID stri
 		Messages: messages,
 		HasMore:  hasMore,
 	}, nil
+}
+
+// EditMessage updates a message's text (author only)
+func (s *messageService) EditMessage(ctx context.Context, messageID, userID, text string) (*models.Message, error) {
+	// Validate message text
+	if !isValidMessageText(text) {
+		return nil, models.ErrInvalidMessageText
+	}
+
+	// Get the existing message to check authorship
+	existingMessage, err := s.messageRepo.GetByID(ctx, messageID)
+	if err != nil {
+		return nil, fmt.Errorf("get message: %w", err)
+	}
+
+	// Check if user is the author (users can only edit their own messages)
+	if existingMessage.AuthorID != userID || existingMessage.AuthorType != "user" {
+		return nil, models.ErrUnauthorizedMessageEdit
+	}
+
+	// Check if user is member of the channel
+	isMember, _, err := s.channelRepo.IsMember(ctx, existingMessage.ChannelID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("check membership: %w", err)
+	}
+	if !isMember {
+		return nil, models.ErrNotChannelMember
+	}
+
+	// Update the message
+	message, err := s.messageRepo.Update(ctx, messageID, text)
+	if err != nil {
+		return nil, fmt.Errorf("update message: %w", err)
+	}
+
+	// Get author email for the response
+	if message.AuthorEmail == "" {
+		if existingMessage.AuthorEmail != "" {
+			message.AuthorEmail = existingMessage.AuthorEmail
+		}
+	}
+
+	return message, nil
+}
+
+// DeleteMessage removes a message (author only)
+func (s *messageService) DeleteMessage(ctx context.Context, messageID, userID string) error {
+	// Get the existing message to check authorship
+	existingMessage, err := s.messageRepo.GetByID(ctx, messageID)
+	if err != nil {
+		return fmt.Errorf("get message: %w", err)
+	}
+
+	// Check if user is the author (users can only delete their own messages)
+	if existingMessage.AuthorID != userID || existingMessage.AuthorType != "user" {
+		return models.ErrUnauthorizedMessageDelete
+	}
+
+	// Check if user is member of the channel
+	isMember, _, err := s.channelRepo.IsMember(ctx, existingMessage.ChannelID, userID)
+	if err != nil {
+		return fmt.Errorf("check membership: %w", err)
+	}
+	if !isMember {
+		return models.ErrNotChannelMember
+	}
+
+	// Delete the message
+	if err := s.messageRepo.Delete(ctx, messageID); err != nil {
+		return fmt.Errorf("delete message: %w", err)
+	}
+
+	return nil
+}
+
+// SearchMessages performs full-text search across messages
+func (s *messageService) SearchMessages(ctx context.Context, query, channelID, userID string, limit int) ([]*models.Message, error) {
+	// Validate query
+	if query == "" {
+		return nil, fmt.Errorf("search query cannot be empty")
+	}
+
+	// Set default limit
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+
+	// If channel specified, check membership
+	if channelID != "" {
+		isMember, _, err := s.channelRepo.IsMember(ctx, channelID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("check membership: %w", err)
+		}
+		if !isMember {
+			return nil, models.ErrNotChannelMember
+		}
+	} else {
+		// If no channel specified, only search channels where user is member
+		// This is more complex - for now we require channelID
+		// TODO: Implement cross-channel search with membership filtering
+		return nil, fmt.Errorf("channel_id is required for search")
+	}
+
+	// Perform search
+	messages, err := s.messageRepo.Search(ctx, query, channelID, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search messages: %w", err)
+	}
+
+	return messages, nil
 }
 
 // isValidMessageText checks if message text is valid

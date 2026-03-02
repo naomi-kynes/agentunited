@@ -136,7 +136,12 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 			// Message routes (nested under channels)
 			r.Post("/{channel_id}/messages", messageHandler.Send)
 			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
+			r.Patch("/{channel_id}/messages/{id}", messageHandler.EditMessage)
+			r.Delete("/{channel_id}/messages/{id}", messageHandler.DeleteMessage)
 		})
+
+		// Message search route
+		r.Get("/messages/search", messageHandler.SearchMessages)
 
 		// DM routes
 		r.Post("/dm", channelHandler.CreateDM)
@@ -183,7 +188,12 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 			// Message routes (nested under channels)
 			r.Post("/{channel_id}/messages", messageHandler.Send)
 			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
+			r.Patch("/{channel_id}/messages/{id}", messageHandler.EditMessage)
+			r.Delete("/{channel_id}/messages/{id}", messageHandler.DeleteMessage)
 		})
+
+		// Message search route
+		r.Get("/messages/search", messageHandler.SearchMessages)
 
 		// DM routes
 		r.Post("/dm", channelHandler.CreateDM)

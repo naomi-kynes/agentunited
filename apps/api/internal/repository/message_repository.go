@@ -12,7 +12,11 @@ import (
 // MessageRepository handles message data access
 type MessageRepository interface {
 	Create(ctx context.Context, message *models.Message) error
+	GetByID(ctx context.Context, messageID string) (*models.Message, error)
+	Update(ctx context.Context, messageID, text string) (*models.Message, error)
+	Delete(ctx context.Context, messageID string) error
 	GetByChannel(ctx context.Context, channelID string, limit int, before string) ([]*models.Message, bool, error)
+	Search(ctx context.Context, query string, channelID string, limit int) ([]*models.Message, error)
 }
 
 // PostgresMessageRepository implements MessageRepository with PostgreSQL
@@ -28,9 +32,9 @@ func NewMessageRepository(db *DB) MessageRepository {
 // Create inserts a new message
 func (r *PostgresMessageRepository) Create(ctx context.Context, message *models.Message) error {
 	query := `
-		INSERT INTO messages (channel_id, author_id, author_type, text, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, created_at
+		INSERT INTO messages (channel_id, author_id, author_type, text, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, updated_at
 	`
 
 	err := r.db.Pool.QueryRow(
@@ -41,7 +45,8 @@ func (r *PostgresMessageRepository) Create(ctx context.Context, message *models.
 		message.AuthorType,
 		message.Text,
 		message.CreatedAt,
-	).Scan(&message.ID, &message.CreatedAt)
+		message.CreatedAt, // Set updated_at to created_at initially
+	).Scan(&message.ID, &message.CreatedAt, &message.UpdatedAt)
 
 	if err != nil {
 		return fmt.Errorf("create message: %w", err)
@@ -69,6 +74,7 @@ func (r *PostgresMessageRepository) GetByChannel(ctx context.Context, channelID 
 				m.author_type,
 				m.text,
 				m.created_at,
+				m.updated_at,
 				CASE 
 					WHEN m.author_type = 'agent' THEN COALESCE(a.display_name, a.name, '')
 					ELSE COALESCE(u.email, '')
@@ -91,6 +97,7 @@ func (r *PostgresMessageRepository) GetByChannel(ctx context.Context, channelID 
 				m.author_type,
 				m.text,
 				m.created_at,
+				m.updated_at,
 				CASE 
 					WHEN m.author_type = 'agent' THEN COALESCE(a.display_name, a.name, '')
 					ELSE COALESCE(u.email, '')
@@ -124,6 +131,7 @@ func (r *PostgresMessageRepository) GetByChannel(ctx context.Context, channelID 
 			&msg.AuthorType,
 			&msg.Text,
 			&msg.CreatedAt,
+			&msg.UpdatedAt,
 			&msg.AuthorEmail,
 		)
 		if err != nil {
@@ -156,6 +164,7 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 			m.author_type,
 			m.text,
 			m.created_at,
+			m.updated_at,
 			CASE 
 				WHEN m.author_type = 'agent' THEN COALESCE(a.display_name, a.name, '')
 				ELSE COALESCE(u.email, '')
@@ -174,6 +183,7 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 		&msg.AuthorType,
 		&msg.Text,
 		&msg.CreatedAt,
+		&msg.UpdatedAt,
 		&msg.AuthorEmail,
 	)
 
@@ -185,4 +195,129 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 	}
 
 	return &msg, nil
+}
+
+// Update modifies a message's text content
+func (r *PostgresMessageRepository) Update(ctx context.Context, messageID, text string) (*models.Message, error) {
+	query := `
+		UPDATE messages
+		SET text = $2, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, channel_id, author_id, author_type, text, created_at, updated_at
+	`
+
+	var msg models.Message
+	err := r.db.Pool.QueryRow(ctx, query, messageID, text).Scan(
+		&msg.ID,
+		&msg.ChannelID,
+		&msg.AuthorID,
+		&msg.AuthorType,
+		&msg.Text,
+		&msg.CreatedAt,
+		&msg.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, models.ErrMessageNotFound
+		}
+		return nil, fmt.Errorf("update message: %w", err)
+	}
+
+	return &msg, nil
+}
+
+// Delete removes a message by ID
+func (r *PostgresMessageRepository) Delete(ctx context.Context, messageID string) error {
+	query := `DELETE FROM messages WHERE id = $1`
+
+	result, err := r.db.Pool.Exec(ctx, query, messageID)
+	if err != nil {
+		return fmt.Errorf("delete message: %w", err)
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return models.ErrMessageNotFound
+	}
+
+	return nil
+}
+
+// Search performs full-text search across messages
+func (r *PostgresMessageRepository) Search(ctx context.Context, query string, channelID string, limit int) ([]*models.Message, error) {
+	// Build the SQL query
+	sqlQuery := `
+		SELECT 
+			m.id,
+			m.channel_id,
+			m.author_id,
+			m.author_type,
+			m.text,
+			m.created_at,
+			m.updated_at,
+			CASE 
+				WHEN m.author_type = 'agent' THEN COALESCE(a.display_name, a.name, '')
+				ELSE COALESCE(u.email, '')
+			END as author_email,
+			ts_rank(m.search_vector, plainto_tsquery('english', $1)) as rank
+		FROM messages m
+		LEFT JOIN users u ON m.author_id = u.id AND m.author_type = 'user'
+		LEFT JOIN agents a ON m.author_id = a.id AND m.author_type = 'agent'
+		WHERE m.search_vector @@ plainto_tsquery('english', $1)
+	`
+
+	args := []interface{}{query}
+	argIndex := 2
+
+	// Add channel filter if specified
+	if channelID != "" {
+		sqlQuery += fmt.Sprintf(" AND m.channel_id = $%d", argIndex)
+		args = append(args, channelID)
+		argIndex++
+	}
+
+	// Order by relevance (rank) and recency
+	sqlQuery += ` ORDER BY rank DESC, m.created_at DESC`
+
+	// Add limit
+	if limit > 0 {
+		sqlQuery += fmt.Sprintf(" LIMIT $%d", argIndex)
+		args = append(args, limit)
+	}
+
+	rows, err := r.db.Pool.Query(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search messages: %w", err)
+	}
+	defer rows.Close()
+
+	var messages []*models.Message
+	for rows.Next() {
+		var msg models.Message
+		var rank float32 // We don't use this in the model, but need to scan it
+
+		err := rows.Scan(
+			&msg.ID,
+			&msg.ChannelID,
+			&msg.AuthorID,
+			&msg.AuthorType,
+			&msg.Text,
+			&msg.CreatedAt,
+			&msg.UpdatedAt,
+			&msg.AuthorEmail,
+			&rank,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan search result: %w", err)
+		}
+
+		messages = append(messages, &msg)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate search results: %w", err)
+	}
+
+	return messages, nil
 }

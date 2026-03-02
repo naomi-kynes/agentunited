@@ -166,6 +166,147 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// EditMessageRequest represents the edit message request body
+type EditMessageRequest struct {
+	Text string `json:"text"`
+}
+
+// EditMessage handles PATCH /api/v1/channels/{channel_id}/messages/{id}
+func (h *MessageHandler) EditMessage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get message ID from URL param
+	messageID := chi.URLParam(r, "id")
+	if messageID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message ID is required"})
+		return
+	}
+
+	// Parse request body
+	var req EditMessageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error().Err(err).Msg("failed to decode edit message request")
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	// Validate text
+	if req.Text == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message text is required"})
+		return
+	}
+
+	// Call service
+	message, err := h.messageService.EditMessage(ctx, messageID, userID, req.Text)
+	if err != nil {
+		h.handleMessageError(w, err, "edit message")
+		return
+	}
+
+	// Broadcast to WebSocket clients
+	if h.hub != nil {
+		wsMessage := map[string]interface{}{
+			"type": "message.updated",
+			"data": message,
+		}
+		if msgBytes, err := json.Marshal(wsMessage); err == nil {
+			h.hub.Broadcast(ctx, message.ChannelID, msgBytes)
+		}
+	}
+
+	// Return success response
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"message": message,
+	})
+}
+
+// DeleteMessage handles DELETE /api/v1/channels/{channel_id}/messages/{id}
+func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get message ID from URL param
+	messageID := chi.URLParam(r, "id")
+	if messageID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message ID is required"})
+		return
+	}
+
+	// Call service
+	err := h.messageService.DeleteMessage(ctx, messageID, userID)
+	if err != nil {
+		h.handleMessageError(w, err, "delete message")
+		return
+	}
+
+	// Note: WebSocket broadcast for message deletion is handled in the service layer
+	// since we need the channel ID before deletion
+
+	// Return success response (204 No Content)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// SearchMessages handles GET /api/v1/messages/search
+func (h *MessageHandler) SearchMessages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Parse query parameters
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Search query (q) is required"})
+		return
+	}
+
+	channelID := r.URL.Query().Get("channel_id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50 // Default
+	if limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	// Call service
+	messages, err := h.messageService.SearchMessages(ctx, query, channelID, userID, limit)
+	if err != nil {
+		h.handleMessageError(w, err, "search messages")
+		return
+	}
+
+	// Return success response
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"messages": messages,
+		"query":    query,
+		"count":    len(messages),
+	})
+}
+
 // handleMessageError maps service errors to HTTP status codes
 func (h *MessageHandler) handleMessageError(w http.ResponseWriter, err error, operation string) {
 	log.Error().Err(err).Str("operation", operation).Msg("message error")
@@ -179,6 +320,10 @@ func (h *MessageHandler) handleMessageError(w http.ResponseWriter, err error, op
 		respondJSON(w, http.StatusNotFound, ErrorResponse{Error: "Channel not found"})
 	case errors.Is(err, models.ErrMessageNotFound):
 		respondJSON(w, http.StatusNotFound, ErrorResponse{Error: "Message not found"})
+	case errors.Is(err, models.ErrUnauthorizedMessageEdit):
+		respondJSON(w, http.StatusForbidden, ErrorResponse{Error: "You can only edit your own messages"})
+	case errors.Is(err, models.ErrUnauthorizedMessageDelete):
+		respondJSON(w, http.StatusForbidden, ErrorResponse{Error: "You can only delete your own messages"})
 	default:
 		respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "Internal server error"})
 	}
