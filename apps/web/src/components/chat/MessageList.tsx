@@ -10,19 +10,7 @@ interface MessageListProps {
   onMessageDeleted?: (messageId: string) => void
 }
 
-// Helper function to format timestamp
-function formatTimestamp(timestamp: string): string {
-  try {
-    const date = new Date(timestamp)
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    })
-  } catch {
-    return timestamp
-  }
-}
+// formatTimestamp removed — MessageItem handles its own formatting
 
 export function MessageList({ 
   messages, 
@@ -60,7 +48,7 @@ export function MessageList({
               type: msg.authorType
             }}
             content={msg.text}
-            timestamp={formatTimestamp(msg.timestamp)}
+            timestamp={msg.timestamp}
             editedAt={msg.editedAt}
             isOwnMessage={msg.isOwnMessage}
             onMessageUpdated={handleMessageUpdated}
