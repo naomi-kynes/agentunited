@@ -256,6 +256,32 @@ export const chatApi = {
   },
 
   /**
+   * Mark a channel as read (clear unread count)
+   */
+  async markChannelRead(channelId: string, lastReadMessageId?: string): Promise<void> {
+    const body = lastReadMessageId ? { last_read_message_id: lastReadMessageId } : {};
+    await apiRequest<void>(
+      `/api/v1/channels/${channelId}/read`,
+      { method: 'POST', body: JSON.stringify(body) }
+    );
+  },
+
+  /**
+   * Get unread counts for all conversations
+   */
+  async getUnreadCounts(): Promise<{
+    total_unread: number;
+    channels: { id: string; name: string; unread_count: number }[];
+    dms: { id: string; unread_count: number }[];
+  }> {
+    return apiRequest<{
+      total_unread: number;
+      channels: { id: string; name: string; unread_count: number }[];
+      dms: { id: string; unread_count: number }[];
+    }>('/api/v1/unread');
+  },
+
+  /**
    * Get WebSocket URL for real-time messages
    */
   getWebSocketUrl(): string {
