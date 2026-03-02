@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/agentunited/backend/internal/models"
 	"github.com/agentunited/backend/internal/service"
@@ -110,9 +112,25 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decode user_id from JWT payload for the frontend
+	// The token is trusted (we just generated it)
+	userID := ""
+	if parts := strings.Split(token, "."); len(parts) == 3 {
+		if payload, err := base64.RawURLEncoding.DecodeString(parts[1]); err == nil {
+			var claims map[string]interface{}
+			if json.Unmarshal(payload, &claims) == nil {
+				if uid, ok := claims["user_id"].(string); ok {
+					userID = uid
+				}
+			}
+		}
+	}
+
 	// Return success response
 	respondJSON(w, http.StatusOK, map[string]string{
-		"token": token,
+		"token":   token,
+		"user_id": userID,
+		"email":   req.Email,
 	})
 }
 
