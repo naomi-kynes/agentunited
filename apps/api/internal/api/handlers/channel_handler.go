@@ -124,6 +124,270 @@ func (h *ChannelHandler) Get(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// UpdateChannelRequest represents the update channel request body
+type UpdateChannelRequest struct {
+	Name  string `json:"name"`
+	Topic string `json:"topic"`
+}
+
+// Update handles PATCH /api/v1/channels/{id}
+func (h *ChannelHandler) Update(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get channel ID from URL param
+	channelID := chi.URLParam(r, "id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+
+	// Parse request body
+	var req UpdateChannelRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error().Err(err).Msg("failed to decode update channel request")
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	// Call service
+	channel, err := h.channelService.Update(ctx, channelID, userID, req.Name, req.Topic)
+	if err != nil {
+		h.handleChannelError(w, err, "update channel")
+		return
+	}
+
+	// Return success response
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"channel": channel,
+	})
+}
+
+// Delete handles DELETE /api/v1/channels/{id}
+func (h *ChannelHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get channel ID from URL param
+	channelID := chi.URLParam(r, "id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+
+	// Call service
+	err := h.channelService.Delete(ctx, channelID, userID)
+	if err != nil {
+		h.handleChannelError(w, err, "delete channel")
+		return
+	}
+
+	// Return success response (204 No Content)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetMembers handles GET /api/v1/channels/{id}/members
+func (h *ChannelHandler) GetMembers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get channel ID from URL param
+	channelID := chi.URLParam(r, "id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+
+	// Call service
+	members, err := h.channelService.GetMembers(ctx, channelID, userID)
+	if err != nil {
+		h.handleChannelError(w, err, "get members")
+		return
+	}
+
+	// Return success response
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"members": members,
+	})
+}
+
+// AddMemberRequest represents the add member request body
+type AddMemberRequest struct {
+	UserID string `json:"user_id"`
+	Role   string `json:"role,omitempty"`
+}
+
+// AddMember handles POST /api/v1/channels/{id}/members
+func (h *ChannelHandler) AddMember(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get channel ID from URL param
+	channelID := chi.URLParam(r, "id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+
+	// Parse request body
+	var req AddMemberRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error().Err(err).Msg("failed to decode add member request")
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	// Validate required fields
+	if req.UserID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "User ID is required"})
+		return
+	}
+
+	// Default role to member if not specified
+	role := req.Role
+	if role == "" {
+		role = "member"
+	}
+
+	// Call service
+	err := h.channelService.AddMember(ctx, channelID, req.UserID, userID, role)
+	if err != nil {
+		h.handleChannelError(w, err, "add member")
+		return
+	}
+
+	// Return success response (201 Created)
+	respondJSON(w, http.StatusCreated, map[string]interface{}{
+		"message": "Member added successfully",
+	})
+}
+
+// RemoveMember handles DELETE /api/v1/channels/{id}/members/{user_id}
+func (h *ChannelHandler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Get channel ID and target user ID from URL params
+	channelID := chi.URLParam(r, "id")
+	targetUserID := chi.URLParam(r, "user_id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+	if targetUserID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "User ID is required"})
+		return
+	}
+
+	// Call service
+	err := h.channelService.RemoveMember(ctx, channelID, targetUserID, userID)
+	if err != nil {
+		h.handleChannelError(w, err, "remove member")
+		return
+	}
+
+	// Return success response (204 No Content)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// CreateDMRequest represents the create DM request body
+type CreateDMRequest struct {
+	UserID string `json:"user_id"`
+}
+
+// CreateDM handles POST /api/v1/dm
+func (h *ChannelHandler) CreateDM(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Parse request body
+	var req CreateDMRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Error().Err(err).Msg("failed to decode create dm request")
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
+		return
+	}
+
+	// Validate required fields
+	if req.UserID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "User ID is required"})
+		return
+	}
+
+	// Call service
+	channel, err := h.channelService.CreateOrGetDMChannel(ctx, userID, req.UserID)
+	if err != nil {
+		h.handleChannelError(w, err, "create dm")
+		return
+	}
+
+	// Return success response
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"channel": channel,
+	})
+}
+
+// ListDMs handles GET /api/v1/dm
+func (h *ChannelHandler) ListDMs(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	// Call service
+	channels, err := h.channelService.ListDMChannels(ctx, userID)
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("failed to list dm channels")
+		respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "Internal server error"})
+		return
+	}
+
+	// Return success response
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"channels": channels,
+	})
+}
+
 // handleChannelError maps service errors to HTTP status codes
 func (h *ChannelHandler) handleChannelError(w http.ResponseWriter, err error, operation string) {
 	log.Error().Err(err).Str("operation", operation).Msg("channel error")
@@ -137,6 +401,12 @@ func (h *ChannelHandler) handleChannelError(w http.ResponseWriter, err error, op
 		respondJSON(w, http.StatusNotFound, ErrorResponse{Error: "Channel not found"})
 	case errors.Is(err, models.ErrNotChannelMember):
 		respondJSON(w, http.StatusForbidden, ErrorResponse{Error: "Not a member of this channel"})
+	case errors.Is(err, models.ErrInsufficientPermissions):
+		respondJSON(w, http.StatusForbidden, ErrorResponse{Error: "Insufficient permissions"})
+	case errors.Is(err, models.ErrAlreadyChannelMember):
+		respondJSON(w, http.StatusConflict, ErrorResponse{Error: "User is already a member of this channel"})
+	case errors.Is(err, models.ErrInvalidDMTarget):
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Cannot create DM with yourself"})
 	default:
 		respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "Internal server error"})
 	}

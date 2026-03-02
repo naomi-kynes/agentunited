@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/agentunited/backend/internal/models"
 	"github.com/jackc/pgx/v5"
@@ -14,10 +15,15 @@ import (
 type ChannelRepository interface {
 	Create(ctx context.Context, channel *models.Channel) error
 	GetByID(ctx context.Context, id string) (*models.Channel, error)
+	Update(ctx context.Context, channelID, name, topic string) (*models.Channel, error)
+	Delete(ctx context.Context, channelID string) error
 	ListByUser(ctx context.Context, userID string) ([]*models.ChannelWithMembers, error)
 	GetMembers(ctx context.Context, channelID string) ([]*models.MemberInfo, error)
 	IsMember(ctx context.Context, channelID, userID string) (bool, string, error)
 	AddMember(ctx context.Context, channelID, userID, role string) error
+	RemoveMember(ctx context.Context, channelID, userID string) error
+	ListDMChannels(ctx context.Context, userID string) ([]*models.ChannelWithMembers, error)
+	GetOrCreateDMChannel(ctx context.Context, user1ID, user2ID string) (*models.Channel, error)
 }
 
 // PostgresChannelRepository implements ChannelRepository with PostgreSQL
@@ -44,8 +50,8 @@ func (r *PostgresChannelRepository) Create(ctx context.Context, channel *models.
 	if channel.ID != "" {
 		// Use provided ID (for bootstrap scenarios)
 		query = `
-			INSERT INTO channels (id, name, topic, created_by, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO channels (id, name, topic, type, created_by, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			RETURNING created_at, updated_at
 		`
 		err = tx.QueryRow(
@@ -54,6 +60,7 @@ func (r *PostgresChannelRepository) Create(ctx context.Context, channel *models.
 			channel.ID,
 			channel.Name,
 			channel.Topic,
+			channel.Type,
 			channel.CreatedBy,
 			channel.CreatedAt,
 			channel.UpdatedAt,
@@ -61,8 +68,8 @@ func (r *PostgresChannelRepository) Create(ctx context.Context, channel *models.
 	} else {
 		// Let database generate ID
 		query = `
-			INSERT INTO channels (name, topic, created_by, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5)
+			INSERT INTO channels (name, topic, type, created_by, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
 			RETURNING id, created_at, updated_at
 		`
 		err = tx.QueryRow(
@@ -70,6 +77,7 @@ func (r *PostgresChannelRepository) Create(ctx context.Context, channel *models.
 			query,
 			channel.Name,
 			channel.Topic,
+			channel.Type,
 			channel.CreatedBy,
 			channel.CreatedAt,
 			channel.UpdatedAt,
@@ -107,7 +115,7 @@ func (r *PostgresChannelRepository) Create(ctx context.Context, channel *models.
 // GetByID retrieves a channel by ID
 func (r *PostgresChannelRepository) GetByID(ctx context.Context, id string) (*models.Channel, error) {
 	query := `
-		SELECT id, name, topic, created_by, created_at, updated_at
+		SELECT id, name, topic, type, created_by, created_at, updated_at
 		FROM channels
 		WHERE id = $1
 	`
@@ -117,6 +125,7 @@ func (r *PostgresChannelRepository) GetByID(ctx context.Context, id string) (*mo
 		&channel.ID,
 		&channel.Name,
 		&channel.Topic,
+		&channel.Type,
 		&channel.CreatedBy,
 		&channel.CreatedAt,
 		&channel.UpdatedAt,
@@ -138,7 +147,8 @@ func (r *PostgresChannelRepository) ListByUser(ctx context.Context, userID strin
 		SELECT 
 			c.id, 
 			c.name, 
-			c.topic, 
+			c.topic,
+			c.type, 
 			c.created_by, 
 			c.created_at, 
 			c.updated_at,
@@ -146,8 +156,8 @@ func (r *PostgresChannelRepository) ListByUser(ctx context.Context, userID strin
 		FROM channels c
 		INNER JOIN channel_members cm ON c.id = cm.channel_id
 		LEFT JOIN channel_members cm2 ON c.id = cm2.channel_id
-		WHERE cm.user_id = $1
-		GROUP BY c.id, c.name, c.topic, c.created_by, c.created_at, c.updated_at
+		WHERE cm.user_id = $1 AND c.type = 'channel'
+		GROUP BY c.id, c.name, c.topic, c.type, c.created_by, c.created_at, c.updated_at
 		ORDER BY c.created_at DESC
 	`
 
@@ -164,6 +174,7 @@ func (r *PostgresChannelRepository) ListByUser(ctx context.Context, userID strin
 			&ch.ID,
 			&ch.Name,
 			&ch.Topic,
+			&ch.Type,
 			&ch.CreatedBy,
 			&ch.CreatedAt,
 			&ch.UpdatedAt,
@@ -257,4 +268,245 @@ func (r *PostgresChannelRepository) AddMember(ctx context.Context, channelID, us
 	}
 
 	return nil
+}
+
+// Update modifies a channel's name and topic
+func (r *PostgresChannelRepository) Update(ctx context.Context, channelID, name, topic string) (*models.Channel, error) {
+	query := `
+		UPDATE channels 
+		SET name = $2, topic = $3, updated_at = NOW()
+		WHERE id = $1
+		RETURNING id, name, topic, type, created_by, created_at, updated_at
+	`
+
+	var channel models.Channel
+	err := r.db.Pool.QueryRow(ctx, query, channelID, name, topic).Scan(
+		&channel.ID,
+		&channel.Name,
+		&channel.Topic,
+		&channel.Type,
+		&channel.CreatedBy,
+		&channel.CreatedAt,
+		&channel.UpdatedAt,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, models.ErrChannelNotFound
+		}
+		// Check for unique constraint violation (duplicate name)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+			return nil, models.ErrChannelNameTaken
+		}
+		return nil, fmt.Errorf("update channel: %w", err)
+	}
+
+	return &channel, nil
+}
+
+// Delete removes a channel and all associated data
+func (r *PostgresChannelRepository) Delete(ctx context.Context, channelID string) error {
+	// Start transaction
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Delete channel (cascade will delete members and messages)
+	result, err := tx.Exec(ctx, "DELETE FROM channels WHERE id = $1", channelID)
+	if err != nil {
+		return fmt.Errorf("delete channel: %w", err)
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return models.ErrChannelNotFound
+	}
+
+	// Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// RemoveMember removes a user from a channel
+func (r *PostgresChannelRepository) RemoveMember(ctx context.Context, channelID, userID string) error {
+	query := `
+		DELETE FROM channel_members 
+		WHERE channel_id = $1 AND user_id = $2
+	`
+
+	result, err := r.db.Pool.Exec(ctx, query, channelID, userID)
+	if err != nil {
+		return fmt.Errorf("remove member: %w", err)
+	}
+
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return models.ErrNotChannelMember
+	}
+
+	return nil
+}
+
+// ListDMChannels retrieves all DM channels for a user
+func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID string) ([]*models.ChannelWithMembers, error) {
+	query := `
+		SELECT 
+			c.id, 
+			c.name, 
+			c.topic,
+			c.type, 
+			c.created_by, 
+			c.created_at, 
+			c.updated_at,
+			COUNT(cm2.id) as member_count
+		FROM channels c
+		INNER JOIN channel_members cm ON c.id = cm.channel_id
+		LEFT JOIN channel_members cm2 ON c.id = cm2.channel_id
+		WHERE cm.user_id = $1 AND c.type = 'dm'
+		GROUP BY c.id, c.name, c.topic, c.type, c.created_by, c.created_at, c.updated_at
+		ORDER BY c.updated_at DESC
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list dm channels: %w", err)
+	}
+	defer rows.Close()
+
+	var channels []*models.ChannelWithMembers
+	for rows.Next() {
+		var ch models.ChannelWithMembers
+		err := rows.Scan(
+			&ch.ID,
+			&ch.Name,
+			&ch.Topic,
+			&ch.Type,
+			&ch.CreatedBy,
+			&ch.CreatedAt,
+			&ch.UpdatedAt,
+			&ch.MemberCount,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scan dm channel: %w", err)
+		}
+		channels = append(channels, &ch)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate dm channels: %w", err)
+	}
+
+	return channels, nil
+}
+
+// GetOrCreateDMChannel gets existing DM channel between two users or creates one
+func (r *PostgresChannelRepository) GetOrCreateDMChannel(ctx context.Context, user1ID, user2ID string) (*models.Channel, error) {
+	// Start transaction
+	tx, err := r.db.Pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Look for existing DM channel between these two users
+	findQuery := `
+		SELECT c.id, c.name, c.topic, c.type, c.created_by, c.created_at, c.updated_at
+		FROM channels c
+		WHERE c.type = 'dm'
+		AND EXISTS (
+			SELECT 1 FROM channel_members cm1 
+			WHERE cm1.channel_id = c.id AND cm1.user_id = $1
+		)
+		AND EXISTS (
+			SELECT 1 FROM channel_members cm2 
+			WHERE cm2.channel_id = c.id AND cm2.user_id = $2
+		)
+		AND (
+			SELECT COUNT(*) FROM channel_members cm 
+			WHERE cm.channel_id = c.id
+		) = 2
+		LIMIT 1
+	`
+
+	var channel models.Channel
+	err = tx.QueryRow(ctx, findQuery, user1ID, user2ID).Scan(
+		&channel.ID,
+		&channel.Name,
+		&channel.Topic,
+		&channel.Type,
+		&channel.CreatedBy,
+		&channel.CreatedAt,
+		&channel.UpdatedAt,
+	)
+
+	if err == nil {
+		// Found existing DM channel
+		if err := tx.Commit(ctx); err != nil {
+			return nil, fmt.Errorf("commit transaction: %w", err)
+		}
+		return &channel, nil
+	}
+
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("find existing dm channel: %w", err)
+	}
+
+	// Create new DM channel
+	now := time.Now()
+	channel = models.Channel{
+		Name:      fmt.Sprintf("dm-%s-%s", user1ID[:8], user2ID[:8]),
+		Topic:     "",
+		Type:      "dm",
+		CreatedBy: user1ID,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	insertQuery := `
+		INSERT INTO channels (name, topic, type, created_by, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, created_at, updated_at
+	`
+
+	err = tx.QueryRow(ctx, insertQuery,
+		channel.Name,
+		channel.Topic,
+		channel.Type,
+		channel.CreatedBy,
+		channel.CreatedAt,
+		channel.UpdatedAt,
+	).Scan(&channel.ID, &channel.CreatedAt, &channel.UpdatedAt)
+
+	if err != nil {
+		return nil, fmt.Errorf("create dm channel: %w", err)
+	}
+
+	// Add both users as members
+	memberQuery := `
+		INSERT INTO channel_members (channel_id, user_id, role, joined_at)
+		VALUES ($1, $2, $3, NOW())
+	`
+
+	_, err = tx.Exec(ctx, memberQuery, channel.ID, user1ID, "member")
+	if err != nil {
+		return nil, fmt.Errorf("add first member to dm channel: %w", err)
+	}
+
+	_, err = tx.Exec(ctx, memberQuery, channel.ID, user2ID, "member")
+	if err != nil {
+		return nil, fmt.Errorf("add second member to dm channel: %w", err)
+	}
+
+	// Commit transaction
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	return &channel, nil
 }

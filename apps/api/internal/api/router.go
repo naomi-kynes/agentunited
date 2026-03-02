@@ -125,11 +125,22 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 			r.Post("/", channelHandler.Create)
 			r.Get("/", channelHandler.List)
 			r.Get("/{id}", channelHandler.Get)
+			r.Patch("/{id}", channelHandler.Update)
+			r.Delete("/{id}", channelHandler.Delete)
+			
+			// Channel member routes
+			r.Get("/{id}/members", channelHandler.GetMembers)
+			r.Post("/{id}/members", channelHandler.AddMember)
+			r.Delete("/{id}/members/{user_id}", channelHandler.RemoveMember)
 			
 			// Message routes (nested under channels)
 			r.Post("/{channel_id}/messages", messageHandler.Send)
 			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
 		})
+
+		// DM routes
+		r.Post("/dm", channelHandler.CreateDM)
+		r.Get("/dm", channelHandler.ListDMs)
 	})
 
 	// Backward compatibility: Mount protected routes on /v1 as well
@@ -161,11 +172,22 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 			r.Post("/", channelHandler.Create)
 			r.Get("/", channelHandler.List)
 			r.Get("/{id}", channelHandler.Get)
+			r.Patch("/{id}", channelHandler.Update)
+			r.Delete("/{id}", channelHandler.Delete)
+			
+			// Channel member routes
+			r.Get("/{id}/members", channelHandler.GetMembers)
+			r.Post("/{id}/members", channelHandler.AddMember)
+			r.Delete("/{id}/members/{user_id}", channelHandler.RemoveMember)
 			
 			// Message routes (nested under channels)
 			r.Post("/{channel_id}/messages", messageHandler.Send)
 			r.Get("/{channel_id}/messages", messageHandler.GetMessages)
 		})
+
+		// DM routes
+		r.Post("/dm", channelHandler.CreateDM)
+		r.Get("/dm", channelHandler.ListDMs)
 	})
 
 	return r

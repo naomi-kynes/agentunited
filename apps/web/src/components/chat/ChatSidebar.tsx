@@ -24,6 +24,7 @@ interface ChatSidebarProps {
   activeChannelId?: string
   onChannelSelect: (id: string) => void
   onDMSelect: (id: string) => void
+  onCreateChannel?: () => void
 }
 
 export function ChatSidebar({
@@ -32,6 +33,7 @@ export function ChatSidebar({
   activeChannelId,
   onChannelSelect,
   onDMSelect,
+  onCreateChannel,
 }: ChatSidebarProps) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -68,7 +70,7 @@ export function ChatSidebar({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Channels
           </span>
-          <button className="rounded p-0.5 hover:bg-sidebar-accent" aria-label="Add channel">
+          <button className="rounded p-0.5 hover:bg-sidebar-accent" aria-label="Add channel" onClick={onCreateChannel}>
             <Plus className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>

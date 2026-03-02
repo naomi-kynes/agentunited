@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChatSidebar } from '../components/chat/ChatSidebar';
 import { ChatHeader } from '../components/chat/ChatHeader';
 import { MessageList } from '../components/chat/MessageList';
 import { MessageInput } from '../components/chat/MessageInput';
+import { CreateChannelModal } from '../components/chat/CreateChannelModal';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { chatApi } from '../services/chatApi';
 import type { Channel } from '../types/chat';
@@ -12,6 +13,7 @@ export function ChatPage() {
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState<string | null>(null);
+  const [showCreateChannel, setShowCreateChannel] = useState(false);
   
   const { messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', selectedChannelId);
 
@@ -54,6 +56,12 @@ export function ChatPage() {
     // TODO: Handle direct message selection
     console.log('Selected DM:', dmId);
   };
+
+  const handleCreateChannel = useCallback(async (name: string, description: string) => {
+    const newChannel = await chatApi.createChannel(name, description);
+    setChannels(prev => [...prev, newChannel]);
+    setSelectedChannelId(newChannel.id);
+  }, []);
 
   // Show loading state while channels are loading
   if (channelsLoading) {
@@ -108,6 +116,13 @@ export function ChatPage() {
         activeChannelId={selectedChannelId}
         onChannelSelect={handleSelectChannel}
         onDMSelect={handleDMSelect}
+        onCreateChannel={() => setShowCreateChannel(true)}
+      />
+
+      <CreateChannelModal
+        isOpen={showCreateChannel}
+        onClose={() => setShowCreateChannel(false)}
+        onSubmit={handleCreateChannel}
       />
 
       <div className="flex-1 flex flex-col">

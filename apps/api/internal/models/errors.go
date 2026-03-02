@@ -55,4 +55,16 @@ var (
 
 	// ErrInstanceAlreadyBootstrapped indicates bootstrap has already been completed
 	ErrInstanceAlreadyBootstrapped = errors.New("instance has already been bootstrapped")
+
+	// ErrInsufficientPermissions indicates user lacks required permissions
+	ErrInsufficientPermissions = errors.New("insufficient permissions")
+
+	// ErrInvalidDMTarget indicates attempting to create DM with invalid user
+	ErrInvalidDMTarget = errors.New("cannot create DM with yourself")
+
+	// ErrUnauthorizedMessageEdit indicates user cannot edit this message
+	ErrUnauthorizedMessageEdit = errors.New("can only edit your own messages")
+
+	// ErrUnauthorizedMessageDelete indicates user cannot delete this message
+	ErrUnauthorizedMessageDelete = errors.New("can only delete your own messages")
 )

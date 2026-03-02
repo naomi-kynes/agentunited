@@ -152,6 +152,27 @@ export const chatApi = {
   },
 
   /**
+   * Create a new channel
+   */
+  async createChannel(name: string, description?: string): Promise<Channel> {
+    try {
+      const body: Record<string, string> = { name };
+      if (description) body.description = description;
+      const response = await apiRequest<{ channel: ApiChannel }>(
+        '/api/v1/channels',
+        {
+          method: 'POST',
+          body: JSON.stringify(body)
+        }
+      );
+      return mapApiChannel(response.channel);
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+      throw error;
+    }
+  },
+
+  /**
    * Get WebSocket URL for real-time messages
    */
   getWebSocketUrl(): string {

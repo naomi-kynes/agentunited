@@ -11,6 +11,7 @@ type Message struct {
 	AuthorEmail string    `json:"author_email,omitempty"` // Joined from users table
 	Text        string    `json:"text"`
 	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // MessageList represents a paginated list of messages
