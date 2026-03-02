@@ -13,10 +13,10 @@
     "dev:electron": "wait-on http://localhost:5180 && electron .",
     "prebuild": "npm run copy-webapp",
     "copy-webapp": "rm -rf webapp && mkdir -p webapp && (cd ../web && npm run build) && cp -r ../web/dist/* webapp/",
-    "build": "npm run prebuild && tsc && vite build && electron-builder",
-    "build:mac": "npm run prebuild && tsc && vite build && electron-builder --mac",
-    "build:dmg": "npm run prebuild && tsc && vite build && electron-builder --mac dmg",
-    "package": "npm run prebuild && tsc && vite build && electron-builder --dir",
+    "build": "npm run prebuild && tsc && electron-builder",
+    "build:mac": "npm run prebuild && tsc && electron-builder --mac",
+    "build:dmg": "npm run prebuild && tsc && electron-builder --mac dmg",
+    "package": "npm run prebuild && tsc && electron-builder --dir",
     "clean": "rm -rf dist build webapp"
   },
   "build": {
