@@ -11,11 +11,13 @@
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
     "dev:electron": "wait-on http://localhost:5180 && electron .",
-    "build": "tsc && vite build && electron-builder",
-    "build:mac": "tsc && vite build && electron-builder --mac",
-    "build:dmg": "tsc && vite build && electron-builder --mac dmg",
-    "package": "electron-builder --dir",
-    "clean": "rm -rf dist build"
+    "prebuild": "npm run copy-webapp",
+    "copy-webapp": "rm -rf webapp && mkdir -p webapp && (cd ../web && npm run build) && cp -r ../web/dist/* webapp/",
+    "build": "npm run prebuild && tsc && vite build && electron-builder",
+    "build:mac": "npm run prebuild && tsc && vite build && electron-builder --mac",
+    "build:dmg": "npm run prebuild && tsc && vite build && electron-builder --mac dmg",
+    "package": "npm run prebuild && tsc && vite build && electron-builder --dir",
+    "clean": "rm -rf dist build webapp"
   },
   "build": {
     "appId": "ai.agentunited.desktop",
@@ -25,6 +27,7 @@
     },
     "files": [
       "dist/**/*",
+      "webapp/**/*",
       "package.json"
     ],
     "mac": {
@@ -73,6 +76,13 @@
         "schemes": [
           "agentunited"
         ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "naomi-kynes",
+        "repo": "agentunited"
       }
     ]
   },

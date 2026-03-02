@@ -59,8 +59,8 @@ const createWindow = () => {
     mainWindow.loadURL('http://localhost:5180');
     mainWindow.webContents.openDevTools();
   } else {
-    // Production: load from built files
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // Production: load from bundled web app
+    mainWindow.loadFile(path.join(__dirname, '../webapp/index.html'));
   }
 
   // Show window when ready
