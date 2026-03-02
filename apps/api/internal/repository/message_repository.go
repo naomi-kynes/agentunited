@@ -32,10 +32,19 @@ func NewMessageRepository(db *DB) MessageRepository {
 // Create inserts a new message
 func (r *PostgresMessageRepository) Create(ctx context.Context, message *models.Message) error {
 	query := `
-		INSERT INTO messages (channel_id, author_id, author_type, text, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO messages (channel_id, author_id, author_type, text, attachment_url, attachment_name, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id, created_at, updated_at
 	`
+
+	// Handle NULL values for attachment fields
+	var attachmentURL, attachmentName interface{}
+	if message.AttachmentURL != "" {
+		attachmentURL = message.AttachmentURL
+	}
+	if message.AttachmentName != "" {
+		attachmentName = message.AttachmentName
+	}
 
 	err := r.db.Pool.QueryRow(
 		ctx,
@@ -44,6 +53,8 @@ func (r *PostgresMessageRepository) Create(ctx context.Context, message *models.
 		message.AuthorID,
 		message.AuthorType,
 		message.Text,
+		attachmentURL,
+		attachmentName,
 		message.CreatedAt,
 		message.CreatedAt, // Set updated_at to created_at initially
 	).Scan(&message.ID, &message.CreatedAt, &message.UpdatedAt)
@@ -73,6 +84,8 @@ func (r *PostgresMessageRepository) GetByChannel(ctx context.Context, channelID 
 				m.author_id,
 				m.author_type,
 				m.text,
+				m.attachment_url,
+				m.attachment_name,
 				m.created_at,
 				m.updated_at,
 				CASE 
@@ -96,6 +109,8 @@ func (r *PostgresMessageRepository) GetByChannel(ctx context.Context, channelID 
 				m.author_id,
 				m.author_type,
 				m.text,
+				m.attachment_url,
+				m.attachment_name,
 				m.created_at,
 				m.updated_at,
 				CASE 
@@ -124,16 +139,27 @@ func (r *PostgresMessageRepository) GetByChannel(ctx context.Context, channelID 
 	var messages []*models.Message
 	for rows.Next() {
 		var msg models.Message
+		var attachmentURL, attachmentName *string
 		err := rows.Scan(
 			&msg.ID,
 			&msg.ChannelID,
 			&msg.AuthorID,
 			&msg.AuthorType,
 			&msg.Text,
+			&attachmentURL,
+			&attachmentName,
 			&msg.CreatedAt,
 			&msg.UpdatedAt,
 			&msg.AuthorEmail,
 		)
+		
+		// Handle NULL attachment fields
+		if attachmentURL != nil {
+			msg.AttachmentURL = *attachmentURL
+		}
+		if attachmentName != nil {
+			msg.AttachmentName = *attachmentName
+		}
 		if err != nil {
 			return nil, false, fmt.Errorf("scan message: %w", err)
 		}
@@ -163,6 +189,8 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 			m.author_id,
 			m.author_type,
 			m.text,
+			m.attachment_url,
+			m.attachment_name,
 			m.created_at,
 			m.updated_at,
 			CASE 
@@ -176,16 +204,27 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 	`
 
 	var msg models.Message
+	var attachmentURL, attachmentName *string
 	err := r.db.Pool.QueryRow(ctx, query, id).Scan(
 		&msg.ID,
 		&msg.ChannelID,
 		&msg.AuthorID,
 		&msg.AuthorType,
 		&msg.Text,
+		&attachmentURL,
+		&attachmentName,
 		&msg.CreatedAt,
 		&msg.UpdatedAt,
 		&msg.AuthorEmail,
 	)
+	
+	// Handle NULL attachment fields
+	if attachmentURL != nil {
+		msg.AttachmentURL = *attachmentURL
+	}
+	if attachmentName != nil {
+		msg.AttachmentName = *attachmentName
+	}
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -254,6 +293,8 @@ func (r *PostgresMessageRepository) Search(ctx context.Context, query string, ch
 			m.author_id,
 			m.author_type,
 			m.text,
+			m.attachment_url,
+			m.attachment_name,
 			m.created_at,
 			m.updated_at,
 			CASE 
@@ -297,17 +338,28 @@ func (r *PostgresMessageRepository) Search(ctx context.Context, query string, ch
 		var msg models.Message
 		var rank float32 // We don't use this in the model, but need to scan it
 
+		var attachmentURL, attachmentName *string
 		err := rows.Scan(
 			&msg.ID,
 			&msg.ChannelID,
 			&msg.AuthorID,
 			&msg.AuthorType,
 			&msg.Text,
+			&attachmentURL,
+			&attachmentName,
 			&msg.CreatedAt,
 			&msg.UpdatedAt,
 			&msg.AuthorEmail,
 			&rank,
 		)
+		
+		// Handle NULL attachment fields
+		if attachmentURL != nil {
+			msg.AttachmentURL = *attachmentURL
+		}
+		if attachmentName != nil {
+			msg.AttachmentName = *attachmentName
+		}
 		if err != nil {
 			return nil, fmt.Errorf("scan search result: %w", err)
 		}

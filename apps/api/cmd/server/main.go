@@ -12,6 +12,7 @@ import (
 	"github.com/agentunited/backend/internal/api"
 	"github.com/agentunited/backend/internal/config"
 	"github.com/agentunited/backend/internal/repository"
+	"github.com/agentunited/backend/internal/utils"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -49,6 +50,12 @@ func main() {
 		log.Fatal().Err(err).Msg("failed to connect to redis")
 	}
 	defer cache.Close()
+
+	// Initialize file storage
+	if err := utils.InitializeStorage(); err != nil {
+		log.Fatal().Err(err).Msg("failed to initialize file storage")
+	}
+	log.Info().Msg("file storage initialized")
 
 	// Setup router
 	router := api.NewRouter(db, cache, cfg.JWT.Secret)

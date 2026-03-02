@@ -5,10 +5,12 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/agentunited/backend/internal/api/middleware"
 	"github.com/agentunited/backend/internal/models"
 	"github.com/agentunited/backend/internal/service"
+	"github.com/agentunited/backend/internal/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
@@ -35,6 +37,7 @@ type SendMessageRequest struct {
 }
 
 // Send handles POST /api/v1/channels/:channel_id/messages
+// Supports both JSON (application/json) and file upload (multipart/form-data)
 func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -46,28 +49,88 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get channel ID from URL param
-	channelID := chi.URLParam(r, "id")
+	channelID := chi.URLParam(r, "channel_id")
 	if channelID == "" {
 		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
 		return
 	}
 
-	// Parse request body
-	var req SendMessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		log.Error().Err(err).Msg("failed to decode send message request")
-		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
-		return
+	// Parse request based on content type
+	contentType := r.Header.Get("Content-Type")
+	var text, attachmentURL, attachmentName string
+
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		// Handle multipart form data (with optional file)
+		if err := r.ParseMultipartForm(utils.MaxFileSize); err != nil {
+			log.Error().Err(err).Msg("failed to parse multipart form")
+			respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid multipart form data"})
+			return
+		}
+
+		// Get text from form
+		text = r.FormValue("text")
+
+		// Handle file upload if present
+		if file, fileHeader, err := r.FormFile("file"); err == nil {
+			defer file.Close()
+
+			// Save the file
+			url, name, saveErr := utils.SaveFile(fileHeader)
+			if saveErr != nil {
+				if fileErr, ok := saveErr.(*utils.FileUploadError); ok {
+					switch fileErr.Code {
+					case "FILE_TOO_LARGE":
+						respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "File size exceeds 10MB limit"})
+					case "INVALID_FILE_TYPE":
+						respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "File type not allowed"})
+					default:
+						respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "File upload failed"})
+					}
+				} else {
+					log.Error().Err(saveErr).Msg("file save error")
+					respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "File upload failed"})
+				}
+				return
+			}
+
+			attachmentURL = url
+			attachmentName = name
+		}
+
+		// At least one of text or file must be provided
+		if text == "" && attachmentURL == "" {
+			respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message text or file is required"})
+			return
+		}
+
+	} else {
+		// Handle JSON request (backward compatibility)
+		var req SendMessageRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			log.Error().Err(err).Msg("failed to decode send message request")
+			respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Invalid request body"})
+			return
+		}
+
+		text = req.Text
+		if text == "" {
+			respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message text is required"})
+			return
+		}
 	}
 
-	// Validate text
-	if req.Text == "" {
-		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message text is required"})
-		return
+	// Create message with attachment info
+	message := &models.Message{
+		ChannelID:      channelID,
+		AuthorID:       userID,
+		AuthorType:     "user",
+		Text:           text,
+		AttachmentURL:  attachmentURL,
+		AttachmentName: attachmentName,
 	}
 
 	// Call service — use agent-aware method when authenticated as agent
-	var message *models.Message
+	var finalMessage *models.Message
 	var err error
 	if agentID, ok := middleware.GetAgentID(ctx); ok {
 		agentName := ""
@@ -78,9 +141,9 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 			AgentID:     agentID,
 			DisplayName: agentName,
 		}
-		message, err = h.messageService.SendAsAgent(ctx, channelID, userID, agentCtx, req.Text)
+		finalMessage, err = h.messageService.SendMessageWithAttachment(ctx, message, &agentCtx)
 	} else {
-		message, err = h.messageService.Send(ctx, channelID, userID, req.Text)
+		finalMessage, err = h.messageService.SendMessageWithAttachment(ctx, message, nil)
 	}
 	if err != nil {
 		h.handleMessageError(w, err, "send message")
@@ -89,19 +152,21 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Dispatch webhooks for message.created event (async)
 	webhookPayload := map[string]interface{}{
-		"channel_id":  message.ChannelID,
-		"message_id":  message.ID,
-		"author_id":   message.AuthorID,
-		"author_type": message.AuthorType,
-		"text":        message.Text,
-		"created_at":  message.CreatedAt,
+		"channel_id":      finalMessage.ChannelID,
+		"message_id":      finalMessage.ID,
+		"author_id":       finalMessage.AuthorID,
+		"author_type":     finalMessage.AuthorType,
+		"text":            finalMessage.Text,
+		"attachment_url":  finalMessage.AttachmentURL,
+		"attachment_name": finalMessage.AttachmentName,
+		"created_at":      finalMessage.CreatedAt,
 	}
 	h.webhookService.DispatchEvent(ctx, channelID, "message.created", webhookPayload)
 
 	// Populate author display info for broadcast
-	if message.AuthorEmail == "" {
+	if finalMessage.AuthorEmail == "" {
 		if agentName, ok := middleware.GetAgentName(ctx); ok && agentName != "" {
-			message.AuthorEmail = agentName
+			finalMessage.AuthorEmail = agentName
 		}
 	}
 
@@ -109,7 +174,7 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 	if h.hub != nil {
 		wsMessage := map[string]interface{}{
 			"type": "message.created",
-			"data": message,
+			"data": finalMessage,
 		}
 		if msgBytes, err := json.Marshal(wsMessage); err == nil {
 			h.hub.Broadcast(ctx, channelID, msgBytes)
@@ -118,7 +183,7 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 
 	// Return success response
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
-		"message": message,
+		"message": finalMessage,
 	})
 }
 

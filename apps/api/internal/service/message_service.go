@@ -19,6 +19,7 @@ type AgentContext struct {
 type MessageService interface {
 	Send(ctx context.Context, channelID, userID, text string) (*models.Message, error)
 	SendAsAgent(ctx context.Context, channelID, ownerID string, agent AgentContext, text string) (*models.Message, error)
+	SendMessageWithAttachment(ctx context.Context, message *models.Message, agentCtx *AgentContext) (*models.Message, error)
 	GetMessages(ctx context.Context, channelID, userID string, limit int, before string) (*models.MessageList, error)
 	EditMessage(ctx context.Context, messageID, userID, text string) (*models.Message, error)
 	DeleteMessage(ctx context.Context, messageID, userID string) error
@@ -94,6 +95,48 @@ func (s *messageService) SendAsAgent(ctx context.Context, channelID, ownerID str
 		CreatedAt:  time.Now(),
 	}
 
+	if err := s.messageRepo.Create(ctx, message); err != nil {
+		return nil, fmt.Errorf("create message: %w", err)
+	}
+
+	return message, nil
+}
+
+// SendMessageWithAttachment sends a message with optional file attachment
+func (s *messageService) SendMessageWithAttachment(ctx context.Context, message *models.Message, agentCtx *AgentContext) (*models.Message, error) {
+	// Check if user is a member of the channel
+	isMember, _, err := s.channelRepo.IsMember(ctx, message.ChannelID, message.AuthorID)
+	if err != nil {
+		return nil, fmt.Errorf("check membership: %w", err)
+	}
+	if !isMember {
+		return nil, models.ErrNotChannelMember
+	}
+
+	// Validate message text (if provided)
+	if message.Text != "" && !isValidMessageText(message.Text) {
+		return nil, models.ErrInvalidMessageText
+	}
+
+	// At least one of text or attachment must be provided
+	if message.Text == "" && message.AttachmentURL == "" {
+		return nil, models.ErrInvalidMessageText
+	}
+
+	// Set timestamps
+	message.CreatedAt = time.Now()
+	message.UpdatedAt = message.CreatedAt
+
+	// Override author info if sending as agent
+	if agentCtx != nil {
+		message.AuthorID = agentCtx.AgentID
+		message.AuthorType = "agent"
+		if agentCtx.DisplayName != "" {
+			message.AuthorEmail = agentCtx.DisplayName
+		}
+	}
+
+	// Create the message
 	if err := s.messageRepo.Create(ctx, message); err != nil {
 		return nil, fmt.Errorf("create message: %w", err)
 	}

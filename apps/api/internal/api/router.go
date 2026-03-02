@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/agentunited/backend/internal/api/handlers"
@@ -48,6 +50,11 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	// Health check handler
 	healthHandler := NewHealthHandler(db, cache)
 	r.Get("/health", healthHandler.Check)
+
+	// Static file serving for uploads
+	workDir, _ := os.Getwd()
+	filesDir := http.Dir(filepath.Join(workDir, "data", "uploads"))
+	r.Handle("/uploads/*", http.StripPrefix("/uploads", http.FileServer(filesDir)))
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
