@@ -4,21 +4,34 @@ import { ChatHeader } from '../components/chat/ChatHeader';
 import { MessageList } from '../components/chat/MessageList';
 import { MessageInput } from '../components/chat/MessageInput';
 import { CreateChannelModal } from '../components/chat/CreateChannelModal';
+import { NewDMModal } from '../components/chat/NewDMModal';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { chatApi } from '../services/chatApi';
 import type { Channel } from '../types/chat';
 
+interface DirectMessage {
+  id: string;
+  name: string;
+  type: 'agent' | 'human';
+  online: boolean;
+  unread?: number;
+}
+
 export function ChatPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
+  const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
+  const [selectedDMId, setSelectedDMId] = useState<string>('');
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState<string | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
-  // TODO: Implement search functionality
-  // const [searchResults, setSearchResults] = useState<Message[] | null>(null);
-  // const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showNewDM, setShowNewDM] = useState(false);
   
-  const { messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', selectedChannelId);
+  // Determine if we're viewing a channel or DM
+  const isViewingDM = !!selectedDMId;
+  const activeConversationId = isViewingDM ? selectedDMId : selectedChannelId;
+  
+  const { messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', activeConversationId);
 
   // Load channels on component mount
   useEffect(() => {
@@ -31,7 +44,7 @@ export function ChatPage() {
         setChannels(fetchedChannels);
         
         // Auto-select first channel if none selected
-        if (fetchedChannels.length > 0 && !selectedChannelId) {
+        if (fetchedChannels.length > 0 && !selectedChannelId && !selectedDMId) {
           setSelectedChannelId(fetchedChannels[0].id);
         }
       } catch (error) {
@@ -43,9 +56,40 @@ export function ChatPage() {
     };
 
     loadChannels();
-  }, [selectedChannelId]);
+  }, [selectedChannelId, selectedDMId]);
+
+  // Load DMs on component mount
+  useEffect(() => {
+    const loadDMs = async () => {
+      try {
+        const dms = await chatApi.listDMs();
+        
+        // Convert channels to DirectMessage format
+        const directMessageList: DirectMessage[] = dms.map(dm => {
+          // TODO: Parse DM name and type from API response when available
+          // For now, assume DM names contain user info
+          const isAgent = dm.name.includes('agent') || dm.name.includes('Agent');
+          return {
+            id: dm.id,
+            name: dm.name,
+            type: isAgent ? 'agent' : 'human',
+            online: Math.random() > 0.3, // TODO: Replace with real online status
+            unread: dm.unread
+          };
+        });
+        
+        setDirectMessages(directMessageList);
+      } catch (error) {
+        console.error('Failed to load DMs:', error);
+        // Don't set error for DMs, just log it
+      }
+    };
+
+    loadDMs();
+  }, []);
 
   const selectedChannel = channels.find(ch => ch.id === selectedChannelId) || null;
+  const selectedDM = directMessages.find(dm => dm.id === selectedDMId) || null;
 
   const handleSendMessage = (text: string) => {
     sendMessage(text);
@@ -53,17 +97,19 @@ export function ChatPage() {
 
   const handleSelectChannel = (channelId: string) => {
     setSelectedChannelId(channelId);
+    setSelectedDMId(''); // Clear DM selection
   };
 
   const handleDMSelect = (dmId: string) => {
-    // TODO: Handle direct message selection
-    console.log('Selected DM:', dmId);
+    setSelectedDMId(dmId);
+    setSelectedChannelId(''); // Clear channel selection
   };
 
   const handleCreateChannel = useCallback(async (name: string, description: string) => {
     const newChannel = await chatApi.createChannel(name, description);
     setChannels(prev => [...prev, newChannel]);
     setSelectedChannelId(newChannel.id);
+    setSelectedDMId(''); // Clear DM selection
   }, []);
 
   const handleSearch = useCallback(async (query: string) => {
@@ -82,6 +128,34 @@ export function ChatPage() {
       setSelectedChannelId(remaining[0]?.id || '');
     }
   }, [selectedChannelId, channels]);
+
+  const handleDMCreated = useCallback(async (dmId: string) => {
+    try {
+      // Reload DMs to get the new one
+      const dms = await chatApi.listDMs();
+      const directMessageList: DirectMessage[] = dms.map(dm => {
+        const isAgent = dm.name.includes('agent') || dm.name.includes('Agent');
+        return {
+          id: dm.id,
+          name: dm.name,
+          type: isAgent ? 'agent' : 'human',
+          online: Math.random() > 0.3,
+          unread: dm.unread
+        };
+      });
+      
+      setDirectMessages(directMessageList);
+      
+      // Select the new DM
+      setSelectedDMId(dmId);
+      setSelectedChannelId(''); // Clear channel selection
+    } catch (error) {
+      console.error('Failed to refresh DMs:', error);
+      // Still select the DM even if refresh failed
+      setSelectedDMId(dmId);
+      setSelectedChannelId('');
+    }
+  }, []);
 
   // Show loading state while channels are loading
   if (channelsLoading) {
@@ -125,8 +199,14 @@ export function ChatPage() {
     );
   }
 
-  // TODO: Fetch DMs from API when DM support is added
-  const directMessages: { id: string; name: string; type: 'agent' | 'human'; online: boolean; unread: number }[] = [];
+  // Determine the active conversation name and type
+  const activeConversationName = isViewingDM 
+    ? selectedDM?.name || 'Unknown'
+    : selectedChannel?.name || 'unknown';
+  
+  const activeConversationTopic = isViewingDM 
+    ? `Direct message with ${selectedDM?.name}`
+    : selectedChannel?.topic;
 
   return (
     <div className="h-screen flex overflow-hidden bg-background">
@@ -137,6 +217,7 @@ export function ChatPage() {
         onChannelSelect={handleSelectChannel}
         onDMSelect={handleDMSelect}
         onCreateChannel={() => setShowCreateChannel(true)}
+        onNewDM={() => setShowNewDM(true)}
         onSearch={handleSearch}
         onChannelUpdate={handleChannelUpdate}
         onChannelDelete={handleChannelDelete}
@@ -148,10 +229,17 @@ export function ChatPage() {
         onSubmit={handleCreateChannel}
       />
 
+      <NewDMModal
+        isOpen={showNewDM}
+        onClose={() => setShowNewDM(false)}
+        onDMCreated={handleDMCreated}
+      />
+
       <div className="flex-1 flex flex-col">
         <ChatHeader
-          channelName={selectedChannel?.name || 'unknown'}
-          topic={selectedChannel?.topic}
+          channelName={activeConversationName}
+          topic={activeConversationTopic}
+          isDM={isViewingDM}
         />
 
         <MessageList messages={messages} />
@@ -164,7 +252,10 @@ export function ChatPage() {
 
         <MessageInput
           onSend={handleSendMessage}
-          placeholder={`Message #${selectedChannel?.name || 'general'}`}
+          placeholder={isViewingDM 
+            ? `Message ${selectedDM?.name || 'user'}`
+            : `Message #${selectedChannel?.name || 'general'}`
+          }
         />
       </div>
     </div>

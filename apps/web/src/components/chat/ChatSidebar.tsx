@@ -22,6 +22,7 @@ interface ChatSidebarProps {
   onChannelSelect: (id: string) => void
   onDMSelect: (id: string) => void
   onCreateChannel?: () => void
+  onNewDM?: () => void
   onSearch?: (query: string) => void
   onChannelUpdate?: (channel: Channel) => void
   onChannelDelete?: (channelId: string) => void
@@ -34,6 +35,7 @@ export function ChatSidebar({
   onChannelSelect,
   onDMSelect,
   onCreateChannel,
+  onNewDM,
   onSearch,
   onChannelUpdate,
   onChannelDelete,
@@ -138,7 +140,7 @@ export function ChatSidebar({
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Direct Messages
           </span>
-          <button className="rounded p-0.5 hover:bg-sidebar-accent" aria-label="New message">
+          <button className="rounded p-0.5 hover:bg-sidebar-accent" aria-label="New message" onClick={onNewDM}>
             <Plus className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
