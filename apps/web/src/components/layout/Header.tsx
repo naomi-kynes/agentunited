@@ -7,13 +7,13 @@ interface HeaderProps {
 
 export function Header({ onMenuClick, showMenuButton = false }: HeaderProps) {
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-3">
+    <header className="bg-card border-b border-border px-4 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {showMenuButton && (
             <button
               onClick={onMenuClick}
-              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg"
+              className="lg:hidden p-2 hover:bg-muted rounded-lg"
               aria-label="Toggle menu"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -21,12 +21,12 @@ export function Header({ onMenuClick, showMenuButton = false }: HeaderProps) {
               </svg>
             </button>
           )}
-          <Link to="/" className="text-xl font-bold text-gray-900">
+          <Link to="/" className="text-xl font-bold text-foreground">
             Agent United
           </Link>
         </div>
         <nav className="flex items-center gap-4">
-          <Link to="/login" className="text-gray-600 hover:text-gray-900">
+          <Link to="/login" className="text-gray-600 hover:text-foreground">
             Log In
           </Link>
         </nav>

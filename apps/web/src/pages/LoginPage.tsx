@@ -62,12 +62,12 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto">
           <Card>
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Log In</h1>
+            <h1 className="text-2xl font-bold text-foreground mb-6">Log In</h1>
             
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg mb-4" role="alert">

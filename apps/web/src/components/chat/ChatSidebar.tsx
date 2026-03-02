@@ -2,6 +2,7 @@ import { Search, ChevronDown, Hash, Plus } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { OnlineIndicator } from "../ui/OnlineIndicator"
 import { TypeBadge } from "../ui/TypeBadge"
+import { ThemeToggle } from "../ui/ThemeToggle"
 
 interface Channel {
   id: string
@@ -43,7 +44,10 @@ export function ChatSidebar({
           <span className="text-sm font-semibold">AgentUnited</span>
           <span className="text-[11px] text-muted-foreground">Workspace</span>
         </div>
-        <ChevronDown className="ml-auto h-4 w-4 text-muted-foreground" />
+        <div className="ml-auto flex items-center gap-1">
+          <ThemeToggle />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </div>
       </div>
 
       {/* Search */}
