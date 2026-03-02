@@ -5,6 +5,7 @@ import { MessageList } from '../components/chat/MessageList';
 import { MessageInput } from '../components/chat/MessageInput';
 import { CreateChannelModal } from '../components/chat/CreateChannelModal';
 import { NewDMModal } from '../components/chat/NewDMModal';
+import { MemberListPanel } from '../components/chat/MemberListPanel';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { chatApi } from '../services/chatApi';
 import type { Channel } from '../types/chat';
@@ -26,6 +27,7 @@ export function ChatPage() {
   const [channelsError, setChannelsError] = useState<string | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
   const [showNewDM, setShowNewDM] = useState(false);
+  const [showMembersPanel, setShowMembersPanel] = useState(false);
   
   // Determine if we're viewing a channel or DM
   const isViewingDM = !!selectedDMId;
@@ -157,6 +159,10 @@ export function ChatPage() {
     }
   }, []);
 
+  const handleToggleMembers = useCallback(() => {
+    setShowMembersPanel(prev => !prev);
+  }, []);
+
   // Show loading state while channels are loading
   if (channelsLoading) {
     return (
@@ -240,6 +246,8 @@ export function ChatPage() {
           channelName={activeConversationName}
           topic={activeConversationTopic}
           isDM={isViewingDM}
+          onToggleMembers={handleToggleMembers}
+          showMembersPanel={showMembersPanel}
         />
 
         <MessageList messages={messages} />
@@ -258,6 +266,16 @@ export function ChatPage() {
           }
         />
       </div>
+
+      {/* Member List Panel - only show for channels, not DMs */}
+      {!isViewingDM && showMembersPanel && selectedChannel && (
+        <MemberListPanel
+          isOpen={showMembersPanel}
+          onClose={() => setShowMembersPanel(false)}
+          channelId={selectedChannel.id}
+          channelName={selectedChannel.name}
+        />
+      )}
     </div>
   );
 }
