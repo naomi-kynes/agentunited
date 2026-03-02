@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
+    ...(process.env.NODE_ENV === 'production' ? [VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192x192.png', 'icon-512x512.png'],
       manifest: {
@@ -50,6 +50,6 @@ export default defineConfig({
           }
         ]
       }
-    })
+    })] : [])
   ],
 })

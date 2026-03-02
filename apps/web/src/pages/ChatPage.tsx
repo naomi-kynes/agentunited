@@ -14,6 +14,9 @@ export function ChatPage() {
   const [channelsLoading, setChannelsLoading] = useState(true);
   const [channelsError, setChannelsError] = useState<string | null>(null);
   const [showCreateChannel, setShowCreateChannel] = useState(false);
+  // TODO: Implement search functionality
+  // const [searchResults, setSearchResults] = useState<Message[] | null>(null);
+  // const [searchQuery, setSearchQuery] = useState<string>('');
   
   const { messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', selectedChannelId);
 
@@ -62,6 +65,23 @@ export function ChatPage() {
     setChannels(prev => [...prev, newChannel]);
     setSelectedChannelId(newChannel.id);
   }, []);
+
+  const handleSearch = useCallback(async (query: string) => {
+    console.log('Search not implemented yet:', query);
+    // TODO: Implement search functionality
+  }, []);
+
+  const handleChannelUpdate = useCallback((updatedChannel: Channel) => {
+    setChannels(prev => prev.map(ch => ch.id === updatedChannel.id ? updatedChannel : ch));
+  }, []);
+
+  const handleChannelDelete = useCallback((channelId: string) => {
+    setChannels(prev => prev.filter(ch => ch.id !== channelId));
+    if (selectedChannelId === channelId && channels.length > 1) {
+      const remaining = channels.filter(ch => ch.id !== channelId);
+      setSelectedChannelId(remaining[0]?.id || '');
+    }
+  }, [selectedChannelId, channels]);
 
   // Show loading state while channels are loading
   if (channelsLoading) {
@@ -117,6 +137,9 @@ export function ChatPage() {
         onChannelSelect={handleSelectChannel}
         onDMSelect={handleDMSelect}
         onCreateChannel={() => setShowCreateChannel(true)}
+        onSearch={handleSearch}
+        onChannelUpdate={handleChannelUpdate}
+        onChannelDelete={handleChannelDelete}
       />
 
       <CreateChannelModal

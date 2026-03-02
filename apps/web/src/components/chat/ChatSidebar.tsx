@@ -1,14 +1,11 @@
-import { Search, ChevronDown, Hash, Plus } from "lucide-react"
+import { useState, useCallback } from "react"
+import { Search, ChevronDown, Hash, Plus, X } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { OnlineIndicator } from "../ui/OnlineIndicator"
 import { TypeBadge } from "../ui/TypeBadge"
 import { ThemeToggle } from "../ui/ThemeToggle"
-
-interface Channel {
-  id: string
-  name: string
-  unread?: number
-}
+import { ChannelContextMenu } from "./ChannelContextMenu"
+import type { Channel } from "../../types/chat"
 
 interface DirectMessage {
   id: string
@@ -25,6 +22,9 @@ interface ChatSidebarProps {
   onChannelSelect: (id: string) => void
   onDMSelect: (id: string) => void
   onCreateChannel?: () => void
+  onSearch?: (query: string) => void
+  onChannelUpdate?: (channel: Channel) => void
+  onChannelDelete?: (channelId: string) => void
 }
 
 export function ChatSidebar({
@@ -34,7 +34,26 @@ export function ChatSidebar({
   onChannelSelect,
   onDMSelect,
   onCreateChannel,
+  onSearch,
+  onChannelUpdate,
+  onChannelDelete,
 }: ChatSidebarProps) {
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const handleSearch = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && searchQuery.trim() && onSearch) {
+      onSearch(searchQuery.trim())
+    }
+  }, [searchQuery, onSearch])
+
+  const handleChannelUpdate = (updatedChannel: Channel) => {
+    onChannelUpdate?.(updatedChannel)
+  }
+
+  const handleChannelDelete = (channelId: string) => {
+    onChannelDelete?.(channelId)
+  }
+
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
       {/* Workspace Header */}
@@ -58,9 +77,17 @@ export function ChatSidebar({
           <Search className="h-3.5 w-3.5 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search..."
+            placeholder="Search messages..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearch}
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
+          {searchQuery && (
+            <button onClick={() => { setSearchQuery(""); }} className="text-muted-foreground hover:text-foreground">
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -80,18 +107,25 @@ export function ChatSidebar({
               key={ch.id}
               onClick={() => onChannelSelect(ch.id)}
               className={cn(
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+                "group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
                 ch.id === activeChannelId
                   ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                   : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
               )}
             >
               <Hash className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{ch.name}</span>
-              {ch.unread && (
+              <span className="truncate flex-1 text-left">{ch.name}</span>
+              {ch.unread ? (
                 <span className="ml-auto flex h-4.5 min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                   {ch.unread}
                 </span>
+              ) : (
+                <ChannelContextMenu
+                  channel={ch}
+                  onChannelUpdate={handleChannelUpdate}
+                  onChannelDelete={handleChannelDelete}
+                  className="ml-auto"
+                />
               )}
             </button>
           ))}

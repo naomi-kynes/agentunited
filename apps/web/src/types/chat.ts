@@ -14,6 +14,7 @@ export interface Channel {
   name: string;
   topic: string;
   memberCount?: number;
+  unread?: number;
 }
 
 export interface WebSocketMessage {

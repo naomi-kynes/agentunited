@@ -173,6 +173,89 @@ export const chatApi = {
   },
 
   /**
+   * Update a channel's description
+   */
+  async updateChannel(channelId: string, updates: { description?: string }): Promise<Channel> {
+    const response = await apiRequest<{ channel: ApiChannel }>(
+      `/api/v1/channels/${channelId}`,
+      { method: 'PATCH', body: JSON.stringify(updates) }
+    );
+    return mapApiChannel(response.channel);
+  },
+
+  /**
+   * Delete a channel
+   */
+  async deleteChannel(channelId: string): Promise<void> {
+    await apiRequest<void>(`/api/v1/channels/${channelId}`, { method: 'DELETE' });
+  },
+
+  /**
+   * Get channel members
+   */
+  async getMembers(channelId: string): Promise<{ id: string; email: string; role: string }[]> {
+    const response = await apiRequest<{ members: { id: string; email: string; role: string }[] }>(
+      `/api/v1/channels/${channelId}/members`
+    );
+    return response.members || [];
+  },
+
+  /**
+   * Search messages
+   */
+  async searchMessages(query: string, channelId?: string): Promise<Message[]> {
+    const params = new URLSearchParams({ q: query });
+    if (channelId) params.set('channel_id', channelId);
+    const response = await apiRequest<{ messages: ApiMessage[]; count: number }>(
+      `/api/v1/messages/search?${params}`
+    );
+    const currentUserId = localStorage.getItem('user-id') || 'current-user';
+    return (response.messages || []).map(msg => mapApiMessage(msg, currentUserId));
+  },
+
+  /**
+   * Edit a message
+   */
+  async editMessage(channelId: string, messageId: string, text: string): Promise<Message> {
+    const response = await apiRequest<{ message: ApiMessage }>(
+      `/api/v1/channels/${channelId}/messages/${messageId}`,
+      { method: 'PATCH', body: JSON.stringify({ text }) }
+    );
+    const currentUserId = localStorage.getItem('user-id') || 'current-user';
+    return mapApiMessage(response.message, currentUserId);
+  },
+
+  /**
+   * Delete a message
+   */
+  async deleteMessage(channelId: string, messageId: string): Promise<void> {
+    await apiRequest<void>(
+      `/api/v1/channels/${channelId}/messages/${messageId}`,
+      { method: 'DELETE' }
+    );
+  },
+
+  /**
+   * Create a DM conversation
+   */
+  async createDM(userId: string): Promise<Channel> {
+    const response = await apiRequest<{ channel: ApiChannel }>(
+      '/api/v1/dm',
+      { method: 'POST', body: JSON.stringify({ user_id: userId }) }
+    );
+    return mapApiChannel(response.channel);
+  },
+
+  /**
+   * List DM conversations
+   */
+  async listDMs(): Promise<Channel[]> {
+    const response = await apiRequest<{ channels: ApiChannel[] } | ApiChannel[]>('/api/v1/dm');
+    const channels = Array.isArray(response) ? response : response.channels || [];
+    return channels.map(mapApiChannel);
+  },
+
+  /**
    * Get WebSocket URL for real-time messages
    */
   getWebSocketUrl(): string {
