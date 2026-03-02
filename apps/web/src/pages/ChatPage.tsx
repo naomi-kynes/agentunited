@@ -31,6 +31,7 @@ export function ChatPage() {
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<{ id: string; name: string; email: string; type: 'agent' | 'human'; online: boolean }[]>([]);
   
   // Determine if we're viewing a channel or DM
   const isViewingDM = !!selectedDMId;
@@ -93,11 +94,49 @@ export function ChatPage() {
     loadDMs();
   }, []);
 
+  // Load members for the selected channel
+  useEffect(() => {
+    if (!selectedChannelId || isViewingDM) return;
+
+    const loadChannelMembers = async () => {
+      try {
+        const members = await chatApi.getMembers(selectedChannelId);
+        
+        // Convert API response to Member format
+        const memberList = members.map(member => {
+          const isAgent = member.email.includes('@agentunited.local');
+          return {
+            id: member.id,
+            name: isAgent 
+              ? member.email.split('@')[0] 
+              : member.email.split('@')[0] || member.email,
+            email: member.email,
+            type: isAgent ? 'agent' as const : 'human' as const,
+            online: Math.random() > 0.3 // TODO: Replace with real online status
+          };
+        });
+
+        setChannelMembers(memberList);
+      } catch (error) {
+        console.error('Failed to load channel members:', error);
+        setChannelMembers([]);
+      }
+    };
+
+    loadChannelMembers();
+  }, [selectedChannelId, isViewingDM]);
+
   const selectedChannel = channels.find(ch => ch.id === selectedChannelId) || null;
   const selectedDM = directMessages.find(dm => dm.id === selectedDMId) || null;
 
-  const handleSendMessage = (text: string) => {
+  const handleSendMessage = (text: string, mentions?: { userId: string; display: string }[]) => {
+    // TODO: Include mentions in the message when API supports it
+    // For now, just send the text
     sendMessage(text);
+    
+    if (mentions && mentions.length > 0) {
+      console.log('Mentions in message:', mentions);
+    }
   };
 
   const handleSelectChannel = (channelId: string) => {
@@ -307,6 +346,7 @@ export function ChatPage() {
 
             <MessageInput
               onSend={handleSendMessage}
+              members={isViewingDM ? [] : channelMembers}
               placeholder={isViewingDM 
                 ? `Message ${selectedDM?.name || 'user'}`
                 : `Message #${selectedChannel?.name || 'general'}`

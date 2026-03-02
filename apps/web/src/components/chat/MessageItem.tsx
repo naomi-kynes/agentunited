@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Avatar } from "../ui/Avatar"
 import { MemberBadge } from "../ui/MemberBadge"
 import { MessageContextMenu } from "./MessageContextMenu"
@@ -129,6 +129,41 @@ export function MessageItem({
     });
   };
 
+  // Format message content with highlighted mentions
+  const formattedContent = useMemo(() => {
+    const mentionRegex = /@(\w+)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = mentionRegex.exec(content)) !== null) {
+      // Add text before mention
+      if (match.index > lastIndex) {
+        parts.push(content.substring(lastIndex, match.index));
+      }
+
+      // Add highlighted mention
+      parts.push(
+        <span
+          key={`mention-${match.index}`}
+          className="bg-primary/10 text-primary px-1 rounded hover:bg-primary/20 cursor-pointer transition-colors"
+          title={`Mentioned @${match[1]}`}
+        >
+          @{match[1]}
+        </span>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+      parts.push(content.substring(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : content;
+  }, [content]);
+
   return (
     <>
       <div className="group flex gap-3 rounded-lg px-5 py-3 transition-colors hover:bg-muted/50">
@@ -186,7 +221,7 @@ export function MessageItem({
           ) : (
             // Display mode
             <div className="mt-1 text-sm leading-relaxed text-foreground/85">
-              {content}
+              {formattedContent}
             </div>
           )}
 
