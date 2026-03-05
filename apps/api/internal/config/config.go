@@ -13,11 +13,22 @@ type Config struct {
 	Database DatabaseConfig
 	Redis    RedisConfig
 	JWT      JWTConfig
+	Relay    RelayConfig
 }
 
 // ServerConfig holds HTTP server settings
 type ServerConfig struct {
 	Port string
+}
+
+// RelayConfig holds relay/tunnel settings for both embedded client and relay server binary.
+type RelayConfig struct {
+	DeploymentMode string
+	Token          string
+	ServerURL      string
+	LocalAPIURL    string
+	Domain         string
+	ListenAddr     string
 }
 
 // DatabaseConfig holds PostgreSQL connection settings
@@ -64,9 +75,10 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("JWT_SECRET is required")
 	}
 
+	serverPort := getEnv("SERVER_PORT", "8080")
 	cfg := &Config{
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
+			Port: serverPort,
 		},
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -85,6 +97,14 @@ func Load() (*Config, error) {
 		JWT: JWTConfig{
 			Secret: jwtSecret,
 			Expiry: jwtExpiry,
+		},
+		Relay: RelayConfig{
+			DeploymentMode: getEnv("DEPLOYMENT_MODE", "self-hosted"),
+			Token:          getEnv("RELAY_TOKEN", ""),
+			ServerURL:      getEnv("RELAY_SERVER", "ws://localhost:8090/tunnel"),
+			LocalAPIURL:    getEnv("RELAY_LOCAL_API", fmt.Sprintf("http://127.0.0.1:%s", serverPort)),
+			Domain:         getEnv("RELAY_DOMAIN", "tunnel.agentunited.ai"),
+			ListenAddr:     getEnv("RELAY_LISTEN_ADDR", ":8090"),
 		},
 	}
 

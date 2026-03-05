@@ -11,6 +11,7 @@ import (
 
 	"github.com/agentunited/backend/internal/api"
 	"github.com/agentunited/backend/internal/config"
+	"github.com/agentunited/backend/internal/relay"
 	"github.com/agentunited/backend/internal/repository"
 	"github.com/agentunited/backend/internal/utils"
 	"github.com/rs/zerolog"
@@ -59,6 +60,15 @@ func main() {
 
 	// Setup router
 	router := api.NewRouter(db, cache, cfg.JWT.Secret)
+
+	// Optional embedded relay client for tunnel deployment mode
+	relayCtx, relayCancel := context.WithCancel(context.Background())
+	defer relayCancel()
+	if cfg.Relay.DeploymentMode == "tunnel" && cfg.Relay.Token != "" {
+		rc := relay.NewClient(cfg.Relay.ServerURL, cfg.Relay.Token, cfg.Relay.LocalAPIURL)
+		go rc.Start(relayCtx)
+		log.Info().Str("relay_server", cfg.Relay.ServerURL).Msg("tunnel mode enabled; starting relay client")
+	}
 
 	// HTTP server
 	server := &http.Server{
