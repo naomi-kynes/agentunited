@@ -59,6 +59,22 @@ func (m *Manager) startLocked() {
 	go c.Start(runCtx)
 }
 
+type State struct {
+	Mode     string `json:"mode"`
+	HasToken bool   `json:"has_token"`
+	Running  bool   `json:"running"`
+}
+
+func (m *Manager) State() State {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return State{
+		Mode:     m.deploymentMode,
+		HasToken: m.token != "",
+		Running:  m.cancel != nil,
+	}
+}
+
 var (
 	globalManager   *Manager
 	globalManagerMu sync.RWMutex

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -9,7 +10,6 @@ import (
 
 	"github.com/agentunited/backend/internal/api/middleware"
 	"github.com/agentunited/backend/internal/models"
-	"github.com/agentunited/backend/internal/realtime"
 	"github.com/agentunited/backend/internal/service"
 	"github.com/agentunited/backend/internal/utils"
 	"github.com/go-chi/chi/v5"
@@ -17,15 +17,24 @@ import (
 )
 
 // MessageHandler handles message HTTP requests
+type RealtimePublisher interface {
+	Enabled() bool
+	Publish(ctx context.Context, channelID string, payload any) error
+}
+
+type Broadcaster interface {
+	Broadcast(ctx context.Context, channelID string, message []byte)
+}
+
 type MessageHandler struct {
 	messageService service.MessageService
 	webhookService service.WebhookService
-	hub            *Hub
-	realtime       *realtime.Engine
+	hub            Broadcaster
+	realtime       RealtimePublisher
 }
 
 // NewMessageHandler creates a new message handler
-func NewMessageHandler(messageService service.MessageService, webhookService service.WebhookService, hub *Hub, rt *realtime.Engine) *MessageHandler {
+func NewMessageHandler(messageService service.MessageService, webhookService service.WebhookService, hub Broadcaster, rt RealtimePublisher) *MessageHandler {
 	return &MessageHandler{
 		messageService: messageService,
 		webhookService: webhookService,
@@ -52,7 +61,7 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get channel ID from URL param
-	channelID := chi.URLParam(r, "id")
+	channelID := chi.URLParam(r, "channel_id")
 	if channelID == "" {
 		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
 		return
@@ -207,7 +216,7 @@ func (h *MessageHandler) GetMessages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get channel ID from URL param
-	channelID := chi.URLParam(r, "id")
+	channelID := chi.URLParam(r, "channel_id")
 	if channelID == "" {
 		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
 		return
@@ -256,7 +265,7 @@ func (h *MessageHandler) EditMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get message ID from URL param
-	messageID := chi.URLParam(r, "message_id")
+	messageID := chi.URLParam(r, "id")
 	if messageID == "" {
 		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message ID is required"})
 		return
@@ -317,7 +326,7 @@ func (h *MessageHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get message ID from URL param
-	messageID := chi.URLParam(r, "message_id")
+	messageID := chi.URLParam(r, "id")
 	if messageID == "" {
 		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Message ID is required"})
 		return

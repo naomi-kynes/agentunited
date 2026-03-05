@@ -119,11 +119,16 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
 			r.Post("/pairing", pairingHandler.AdminPairing)
+			r.Get("/tunnel/status", pairingHandler.TunnelStatus)
+			r.Post("/tunnel/subdomain/check", pairingHandler.SubdomainCheck)
+			r.Post("/tunnel/subdomain/claim", pairingHandler.SubdomainClaim)
+			r.Get("/pairing/status", pairingHandler.PairingStatus)
 		})
 
 		// Centrifugo auth/ops routes
 		r.Route("/realtime/centrifugo", func(r chi.Router) {
 			r.Post("/subscribe-token", centrifugoHandler.SubscribeToken)
+			r.Post("/refresh-token", centrifugoHandler.RefreshToken)
 			r.Get("/presence", centrifugoHandler.Presence)
 			r.Get("/history", centrifugoHandler.History)
 		})
@@ -187,11 +192,16 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
 			r.Post("/pairing", pairingHandler.AdminPairing)
+			r.Get("/tunnel/status", pairingHandler.TunnelStatus)
+			r.Post("/tunnel/subdomain/check", pairingHandler.SubdomainCheck)
+			r.Post("/tunnel/subdomain/claim", pairingHandler.SubdomainClaim)
+			r.Get("/pairing/status", pairingHandler.PairingStatus)
 		})
 
 		// Centrifugo auth/ops routes
 		r.Route("/realtime/centrifugo", func(r chi.Router) {
 			r.Post("/subscribe-token", centrifugoHandler.SubscribeToken)
+			r.Post("/refresh-token", centrifugoHandler.RefreshToken)
 			r.Get("/presence", centrifugoHandler.Presence)
 			r.Get("/history", centrifugoHandler.History)
 		})

@@ -28,6 +28,10 @@ type subscribeTokenRequest struct {
 	ChannelID string `json:"channel_id"`
 }
 
+type refreshTokenRequest struct {
+	ChannelID string `json:"channel_id"`
+}
+
 func (h *CentrifugoHandler) SubscribeToken(w http.ResponseWriter, r *http.Request) {
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
@@ -41,7 +45,29 @@ func (h *CentrifugoHandler) SubscribeToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	isMember, _, err := h.channelService.IsMember(r.Context(), req.ChannelID, userID)
+	h.issueToken(w, r, userID, req.ChannelID)
+}
+
+// RefreshToken issues a new short-lived Centrifugo subscription token for an already selected channel.
+// Clients call this before token expiry to maintain uninterrupted subscriptions.
+func (h *CentrifugoHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+
+	var req refreshTokenRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ChannelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "channel_id is required"})
+		return
+	}
+
+	h.issueToken(w, r, userID, req.ChannelID)
+}
+
+func (h *CentrifugoHandler) issueToken(w http.ResponseWriter, r *http.Request, userID, channelID string) {
+	isMember, _, err := h.channelService.IsMember(r.Context(), channelID, userID)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "membership check failed"})
 		return
@@ -51,12 +77,12 @@ func (h *CentrifugoHandler) SubscribeToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	token, err := h.rt.GenerateSubscribeToken(userID, req.ChannelID, 10*time.Minute)
+	token, err := h.rt.GenerateSubscribeToken(userID, channelID, 10*time.Minute)
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
 		return
 	}
-	respondJSON(w, http.StatusOK, map[string]any{"token": token, "channel": h.rt.Channel(req.ChannelID)})
+	respondJSON(w, http.StatusOK, map[string]any{"token": token, "channel": h.rt.Channel(channelID), "expires_in": 600})
 }
 
 func (h *CentrifugoHandler) Presence(w http.ResponseWriter, r *http.Request) {

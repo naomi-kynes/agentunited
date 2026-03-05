@@ -7,190 +7,146 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/agentunited/backend/internal/api/middleware"
 	"github.com/agentunited/backend/internal/models"
+	"github.com/agentunited/backend/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
-// MockMessageService is a mock implementation of MessageService
-type MockMessageService struct {
-	mock.Mock
-}
+type mockMessageService struct{ mock.Mock }
 
-func (m *MockMessageService) Send(ctx context.Context, channelID, userID, text string) (*models.Message, error) {
+type mockWebhookService struct{ mock.Mock }
+
+type mockRealtime struct{ mock.Mock }
+
+type mockBroadcaster struct{ mock.Mock }
+
+func (m *mockMessageService) Send(ctx context.Context, channelID, userID, text string) (*models.Message, error) {
 	args := m.Called(ctx, channelID, userID, text)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.Message), args.Error(1)
 }
-
-func (m *MockMessageService) GetMessages(ctx context.Context, channelID, userID string, limit int, before string) (*models.MessageList, error) {
+func (m *mockMessageService) SendAsAgent(ctx context.Context, channelID, ownerID string, agent service.AgentContext, text string) (*models.Message, error) {
+	args := m.Called(ctx, channelID, ownerID, agent, text)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Message), args.Error(1)
+}
+func (m *mockMessageService) SendMessageWithAttachment(ctx context.Context, message *models.Message, agentCtx *service.AgentContext) (*models.Message, error) {
+	args := m.Called(ctx, message, agentCtx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.Message), args.Error(1)
+}
+func (m *mockMessageService) GetMessages(ctx context.Context, channelID, userID string, limit int, before string) (*models.MessageList, error) {
 	args := m.Called(ctx, channelID, userID, limit, before)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).(*models.MessageList), args.Error(1)
 }
-
-// Test: Send message successfully
-func TestMessageHandler_Send_Success(t *testing.T) {
-	mockService := new(MockMessageService)
-	handler := NewMessageHandler(mockService)
-
-	message := &models.Message{
-		ID:        "test-message-id",
-		ChannelID: "test-channel-id",
-		AuthorID:  "test-user-id",
-		Text:      "Hello world",
+func (m *mockMessageService) EditMessage(ctx context.Context, messageID, userID, text string) (*models.Message, error) {
+	args := m.Called(ctx, messageID, userID, text)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-
-	mockService.On("Send", mock.Anything, "test-channel-id", "test-user-id", "Hello world").
-		Return(message, nil)
-
-	reqBody := map[string]string{
-		"text": "Hello world",
+	return args.Get(0).(*models.Message), args.Error(1)
+}
+func (m *mockMessageService) DeleteMessage(ctx context.Context, messageID, userID string) error {
+	return m.Called(ctx, messageID, userID).Error(0)
+}
+func (m *mockMessageService) SearchMessages(ctx context.Context, query, channelID, userID string, limit int) ([]*models.Message, error) {
+	args := m.Called(ctx, query, channelID, userID, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	bodyJSON, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/channels/test-channel-id/messages", bytes.NewReader(bodyJSON))
+	return args.Get(0).([]*models.Message), args.Error(1)
+}
+
+func (m *mockWebhookService) CreateWebhook(ctx context.Context, agentID, ownerID string, req *models.CreateWebhookRequest) (*models.Webhook, error) {
+	return nil, nil
+}
+func (m *mockWebhookService) ListWebhooks(ctx context.Context, agentID, ownerID string) ([]*models.Webhook, error) {
+	return nil, nil
+}
+func (m *mockWebhookService) DeleteWebhook(ctx context.Context, webhookID, agentID, ownerID string) error {
+	return nil
+}
+func (m *mockWebhookService) ListDeliveries(ctx context.Context, webhookID, agentID, ownerID string, limit int) ([]*models.WebhookDelivery, error) {
+	return nil, nil
+}
+func (m *mockWebhookService) DispatchEvent(ctx context.Context, channelID, eventType string, payload map[string]interface{}) {
+	m.Called(ctx, channelID, eventType, payload)
+}
+
+func (m *mockRealtime) Enabled() bool {
+	return m.Called().Bool(0)
+}
+func (m *mockRealtime) Publish(ctx context.Context, channelID string, payload any) error {
+	return m.Called(ctx, channelID, payload).Error(0)
+}
+
+func (m *mockBroadcaster) Broadcast(ctx context.Context, channelID string, message []byte) {
+	m.Called(ctx, channelID, message)
+}
+
+func buildSendRequest(t *testing.T) *http.Request {
+	body, _ := json.Marshal(map[string]string{"text": "hello"})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/channels/ch1/messages", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
-
-	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "test-user-id")
-	req = req.WithContext(ctx)
-
+	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "u1")
 	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("channel_id", "test-channel-id")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	rctx.URLParams.Add("channel_id", "ch1")
+	ctx = context.WithValue(ctx, chi.RouteCtxKey, rctx)
+	return req.WithContext(ctx)
+}
+
+func TestSend_PublishesToCentrifugo_WhenEnabled(t *testing.T) {
+	ms := new(mockMessageService)
+	ws := new(mockWebhookService)
+	rt := new(mockRealtime)
+	hb := new(mockBroadcaster)
+	h := NewMessageHandler(ms, ws, hb, rt)
+
+	msg := &models.Message{ID: "m1", ChannelID: "ch1", AuthorID: "u1", Text: "hello", CreatedAt: time.Now()}
+	ms.On("SendMessageWithAttachment", mock.Anything, mock.AnythingOfType("*models.Message"), (*service.AgentContext)(nil)).Return(msg, nil)
+	ws.On("DispatchEvent", mock.Anything, "ch1", "message.created", mock.Anything).Return()
+	rt.On("Enabled").Return(true)
+	rt.On("Publish", mock.Anything, "ch1", mock.Anything).Return(nil)
 
 	rr := httptest.NewRecorder()
-
-	handler.Send(rr, req)
+	h.Send(rr, buildSendRequest(t))
 
 	assert.Equal(t, http.StatusCreated, rr.Code)
-
-	var response map[string]interface{}
-	err := json.NewDecoder(rr.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.Contains(t, response, "message")
-	msg := response["message"].(map[string]interface{})
-	assert.Equal(t, "Hello world", msg["text"])
-
-	mockService.AssertExpectations(t)
+	rt.AssertCalled(t, "Publish", mock.Anything, "ch1", mock.Anything)
+	hb.AssertNotCalled(t, "Broadcast", mock.Anything, mock.Anything, mock.Anything)
 }
 
-// Test: Send message when not a member
-func TestMessageHandler_Send_NotMember(t *testing.T) {
-	mockService := new(MockMessageService)
-	handler := NewMessageHandler(mockService)
+func TestSend_UsesHubFallback_WhenCentrifugoDisabled(t *testing.T) {
+	ms := new(mockMessageService)
+	ws := new(mockWebhookService)
+	rt := new(mockRealtime)
+	hb := new(mockBroadcaster)
+	h := NewMessageHandler(ms, ws, hb, rt)
 
-	mockService.On("Send", mock.Anything, "test-channel-id", "test-user-id", "Hello").
-		Return(nil, models.ErrNotChannelMember)
-
-	reqBody := map[string]string{
-		"text": "Hello",
-	}
-	bodyJSON, _ := json.Marshal(reqBody)
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/channels/test-channel-id/messages", bytes.NewReader(bodyJSON))
-	req.Header.Set("Content-Type", "application/json")
-
-	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "test-user-id")
-	req = req.WithContext(ctx)
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("channel_id", "test-channel-id")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+	msg := &models.Message{ID: "m1", ChannelID: "ch1", AuthorID: "u1", Text: "hello", CreatedAt: time.Now()}
+	ms.On("SendMessageWithAttachment", mock.Anything, mock.AnythingOfType("*models.Message"), (*service.AgentContext)(nil)).Return(msg, nil)
+	ws.On("DispatchEvent", mock.Anything, "ch1", "message.created", mock.Anything).Return()
+	rt.On("Enabled").Return(false)
+	hb.On("Broadcast", mock.Anything, "ch1", mock.AnythingOfType("[]uint8")).Return()
 
 	rr := httptest.NewRecorder()
+	h.Send(rr, buildSendRequest(t))
 
-	handler.Send(rr, req)
-
-	assert.Equal(t, http.StatusForbidden, rr.Code)
-
-	mockService.AssertExpectations(t)
-}
-
-// Test: Get messages successfully
-func TestMessageHandler_GetMessages_Success(t *testing.T) {
-	mockService := new(MockMessageService)
-	handler := NewMessageHandler(mockService)
-
-	messageList := &models.MessageList{
-		Messages: []*models.Message{
-			{ID: "msg1", Text: "Message 1"},
-			{ID: "msg2", Text: "Message 2"},
-		},
-		HasMore: false,
-	}
-
-	mockService.On("GetMessages", mock.Anything, "test-channel-id", "test-user-id", 50, "").
-		Return(messageList, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/channels/test-channel-id/messages", nil)
-
-	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "test-user-id")
-	req = req.WithContext(ctx)
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("channel_id", "test-channel-id")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
-
-	rr := httptest.NewRecorder()
-
-	handler.GetMessages(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	var response map[string]interface{}
-	err := json.NewDecoder(rr.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.Contains(t, response, "messages")
-	assert.Contains(t, response, "has_more")
-	assert.False(t, response["has_more"].(bool))
-
-	mockService.AssertExpectations(t)
-}
-
-// Test: Get messages with limit and before parameters
-func TestMessageHandler_GetMessages_WithParams(t *testing.T) {
-	mockService := new(MockMessageService)
-	handler := NewMessageHandler(mockService)
-
-	messageList := &models.MessageList{
-		Messages: []*models.Message{
-			{ID: "msg3", Text: "Message 3"},
-		},
-		HasMore: true,
-	}
-
-	mockService.On("GetMessages", mock.Anything, "test-channel-id", "test-user-id", 10, "msg2-id").
-		Return(messageList, nil)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/channels/test-channel-id/messages?limit=10&before=msg2-id", nil)
-
-	ctx := context.WithValue(req.Context(), middleware.UserIDKey, "test-user-id")
-	req = req.WithContext(ctx)
-
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("channel_id", "test-channel-id")
-	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
-
-	rr := httptest.NewRecorder()
-
-	handler.GetMessages(rr, req)
-
-	assert.Equal(t, http.StatusOK, rr.Code)
-
-	var response map[string]interface{}
-	err := json.NewDecoder(rr.Body).Decode(&response)
-	require.NoError(t, err)
-
-	assert.True(t, response["has_more"].(bool))
-
-	mockService.AssertExpectations(t)
+	assert.Equal(t, http.StatusCreated, rr.Code)
+	hb.AssertCalled(t, "Broadcast", mock.Anything, "ch1", mock.AnythingOfType("[]uint8"))
+	rt.AssertNotCalled(t, "Publish", mock.Anything, mock.Anything, mock.Anything)
 }

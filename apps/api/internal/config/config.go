@@ -32,6 +32,7 @@ type RelayConfig struct {
 	Domain         string
 	ListenAddr     string
 	ConfigFile     string
+	Subdomain      string
 }
 
 // CentrifugoConfig holds real-time engine integration settings.
@@ -91,6 +92,7 @@ func Load() (*Config, error) {
 	relayConfigFile := getEnv("RELAY_CONFIG_FILE", "data/relay_config.json")
 	deploymentMode := getEnv("DEPLOYMENT_MODE", "self-hosted")
 	relayToken := getEnv("RELAY_TOKEN", "")
+	relaySubdomain := ""
 	if relayToken == "" {
 		if persisted, err := loadPersistedRelayConfig(relayConfigFile); err == nil {
 			if persisted.RelayToken != "" {
@@ -99,6 +101,7 @@ func Load() (*Config, error) {
 			if deploymentMode == "self-hosted" && persisted.DeploymentMode != "" {
 				deploymentMode = persisted.DeploymentMode
 			}
+			relaySubdomain = persisted.Subdomain
 		}
 	}
 
@@ -132,6 +135,7 @@ func Load() (*Config, error) {
 			Domain:         getEnv("RELAY_DOMAIN", "tunnel.agentunited.ai"),
 			ListenAddr:     getEnv("RELAY_LISTEN_ADDR", ":8090"),
 			ConfigFile:     relayConfigFile,
+			Subdomain:      relaySubdomain,
 		},
 		Centrifugo: CentrifugoConfig{
 			Enabled:         getEnvBool("CENTRIFUGO_ENABLED", false),
@@ -181,6 +185,7 @@ func getEnvBool(key string, defaultValue bool) bool {
 type persistedRelayConfig struct {
 	DeploymentMode string `json:"deployment_mode"`
 	RelayToken     string `json:"relay_token"`
+	Subdomain      string `json:"subdomain,omitempty"`
 }
 
 func loadPersistedRelayConfig(path string) (*persistedRelayConfig, error) {
