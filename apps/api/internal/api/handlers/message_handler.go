@@ -9,6 +9,7 @@ import (
 
 	"github.com/agentunited/backend/internal/api/middleware"
 	"github.com/agentunited/backend/internal/models"
+	"github.com/agentunited/backend/internal/realtime"
 	"github.com/agentunited/backend/internal/service"
 	"github.com/agentunited/backend/internal/utils"
 	"github.com/go-chi/chi/v5"
@@ -20,14 +21,16 @@ type MessageHandler struct {
 	messageService service.MessageService
 	webhookService service.WebhookService
 	hub            *Hub
+	realtime       *realtime.Engine
 }
 
 // NewMessageHandler creates a new message handler
-func NewMessageHandler(messageService service.MessageService, webhookService service.WebhookService, hub *Hub) *MessageHandler {
+func NewMessageHandler(messageService service.MessageService, webhookService service.WebhookService, hub *Hub, rt *realtime.Engine) *MessageHandler {
 	return &MessageHandler{
 		messageService: messageService,
 		webhookService: webhookService,
 		hub:            hub,
+		realtime:       rt,
 	}
 }
 
@@ -170,8 +173,13 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Broadcast to WebSocket clients
-	if h.hub != nil {
+	// Fan-out via Centrifugo (engine-first). Keep legacy hub as fallback.
+	if h.realtime != nil && h.realtime.Enabled() {
+		_ = h.realtime.Publish(ctx, channelID, map[string]interface{}{
+			"type": "message.created",
+			"data": finalMessage,
+		})
+	} else if h.hub != nil {
 		wsMessage := map[string]interface{}{
 			"type": "message.created",
 			"data": finalMessage,
@@ -275,8 +283,13 @@ func (h *MessageHandler) EditMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Broadcast to WebSocket clients
-	if h.hub != nil {
+	// Fan-out via Centrifugo (engine-first). Keep legacy hub as fallback.
+	if h.realtime != nil && h.realtime.Enabled() {
+		_ = h.realtime.Publish(ctx, message.ChannelID, map[string]interface{}{
+			"type": "message.updated",
+			"data": message,
+		})
+	} else if h.hub != nil {
 		wsMessage := map[string]interface{}{
 			"type": "message.updated",
 			"data": message,

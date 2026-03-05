@@ -69,7 +69,7 @@ func main() {
 	}
 
 	// Setup router
-	router := api.NewRouter(db, cache, cfg.JWT.Secret)
+	router := api.NewRouter(db, cache, cfg)
 
 	// HTTP server
 	server := &http.Server{

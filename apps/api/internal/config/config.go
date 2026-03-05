@@ -10,11 +10,12 @@ import (
 
 // Config holds application configuration
 type Config struct {
-	Server   ServerConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
-	Relay    RelayConfig
+	Server     ServerConfig
+	Database   DatabaseConfig
+	Redis      RedisConfig
+	JWT        JWTConfig
+	Relay      RelayConfig
+	Centrifugo CentrifugoConfig
 }
 
 // ServerConfig holds HTTP server settings
@@ -31,6 +32,15 @@ type RelayConfig struct {
 	Domain         string
 	ListenAddr     string
 	ConfigFile     string
+}
+
+// CentrifugoConfig holds real-time engine integration settings.
+type CentrifugoConfig struct {
+	Enabled         bool
+	APIURL          string
+	APIKey          string
+	TokenHMACSecret string
+	ChannelPrefix   string
 }
 
 // DatabaseConfig holds PostgreSQL connection settings
@@ -123,6 +133,13 @@ func Load() (*Config, error) {
 			ListenAddr:     getEnv("RELAY_LISTEN_ADDR", ":8090"),
 			ConfigFile:     relayConfigFile,
 		},
+		Centrifugo: CentrifugoConfig{
+			Enabled:         getEnvBool("CENTRIFUGO_ENABLED", false),
+			APIURL:          getEnv("CENTRIFUGO_API_URL", "http://localhost:8000/api"),
+			APIKey:          getEnv("CENTRIFUGO_API_KEY", ""),
+			TokenHMACSecret: getEnv("CENTRIFUGO_TOKEN_HMAC_SECRET", ""),
+			ChannelPrefix:   getEnv("CENTRIFUGO_CHANNEL_PREFIX", "channel:"),
+		},
 	}
 
 	return cfg, nil
@@ -147,6 +164,18 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func getEnvBool(key string, defaultValue bool) bool {
+	v := os.Getenv(key)
+	if v == "" {
+		return defaultValue
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return defaultValue
+	}
+	return b
 }
 
 type persistedRelayConfig struct {

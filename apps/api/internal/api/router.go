@@ -8,6 +8,8 @@ import (
 
 	"github.com/agentunited/backend/internal/api/handlers"
 	mw "github.com/agentunited/backend/internal/api/middleware"
+	"github.com/agentunited/backend/internal/config"
+	"github.com/agentunited/backend/internal/realtime"
 	"github.com/agentunited/backend/internal/repository"
 	"github.com/agentunited/backend/internal/service"
 	"github.com/go-chi/chi/v5"
@@ -17,7 +19,7 @@ import (
 )
 
 // NewRouter creates and configures the Chi router
-func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *chi.Mux {
+func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middleware
@@ -66,14 +68,15 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	inviteRepo := repository.NewInviteRepository(db)
 
 	// Initialize services
-	authService := service.NewAuthService(userRepo, jwtSecret)
+	authService := service.NewAuthService(userRepo, cfg.JWT.Secret)
 	channelService := service.NewChannelService(channelRepo)
 	messageService := service.NewMessageService(messageRepo, channelRepo, agentRepo)
+	realtimeEngine := realtime.New(cfg.Centrifugo)
 	agentService := service.NewAgentService(agentRepo)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, agentRepo)
 	webhookService := service.NewWebhookService(webhookRepo, agentRepo)
-	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, jwtSecret, "http://localhost:8080")
-	inviteService := service.NewInviteService(userRepo, inviteRepo, jwtSecret)
+	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, cfg.JWT.Secret, "http://localhost:8080")
+	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret)
 
 	// Initialize WebSocket hub first (needed by message handler)
 	hub := handlers.NewHub()
@@ -81,14 +84,15 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	channelHandler := handlers.NewChannelHandler(channelService)
-	messageHandler := handlers.NewMessageHandler(messageService, webhookService, hub)
+	messageHandler := handlers.NewMessageHandler(messageService, webhookService, hub, realtimeEngine)
 	agentHandler := handlers.NewAgentHandler(agentService)
 	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyService)
 	webhookHandler := handlers.NewWebhookHandler(webhookService)
 	bootstrapHandler := handlers.NewBootstrapHandler(bootstrapService)
 	inviteHandler := handlers.NewInviteHandler(inviteService)
 	pairingHandler := handlers.NewPairingHandler()
-	wsHandler := handlers.NewWebSocketHandlerV2(messageService, channelService, jwtSecret, hub)
+	centrifugoHandler := handlers.NewCentrifugoHandler(realtimeEngine, channelService)
+	wsHandler := handlers.NewWebSocketHandlerV2(messageService, channelService, cfg.JWT.Secret, hub)
 
 	// WebSocket endpoint — no timeout middleware (long-lived connection)
 	r.Handle("/ws", wsHandler)
@@ -110,11 +114,18 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 
 	// Protected API v1 routes (require JWT or API key authentication)
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(mw.Auth(jwtSecret, apiKeyRepo, agentRepo))
+		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo))
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
 			r.Post("/pairing", pairingHandler.AdminPairing)
+		})
+
+		// Centrifugo auth/ops routes
+		r.Route("/realtime/centrifugo", func(r chi.Router) {
+			r.Post("/subscribe-token", centrifugoHandler.SubscribeToken)
+			r.Get("/presence", centrifugoHandler.Presence)
+			r.Get("/history", centrifugoHandler.History)
 		})
 
 		// Agent routes
@@ -171,11 +182,18 @@ func NewRouter(db *repository.DB, cache *repository.Cache, jwtSecret string) *ch
 
 	// Backward compatibility: Mount protected routes on /v1 as well
 	r.Route("/v1", func(r chi.Router) {
-		r.Use(mw.Auth(jwtSecret, apiKeyRepo, agentRepo))
+		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo))
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
 			r.Post("/pairing", pairingHandler.AdminPairing)
+		})
+
+		// Centrifugo auth/ops routes
+		r.Route("/realtime/centrifugo", func(r chi.Router) {
+			r.Post("/subscribe-token", centrifugoHandler.SubscribeToken)
+			r.Get("/presence", centrifugoHandler.Presence)
+			r.Get("/history", centrifugoHandler.History)
 		})
 
 		// Agent routes
