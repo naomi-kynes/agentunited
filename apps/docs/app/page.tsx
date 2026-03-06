@@ -3,23 +3,23 @@ import Link from "next/link";
 const featuredGuides = [
   {
     href: "/docs/quickstart",
-    title: "Ship the first integration",
+    title: "Get started in 60 seconds",
     description:
-      "Install Agent United, bring up the stack, and send the first message in a few minutes.",
+      "Clone the repo, bring up Docker Compose, and send your first message. No config required.",
     eyebrow: "Quickstart",
   },
   {
     href: "/docs/agent-guide",
-    title: "Wire in an AI agent",
+    title: "Connect your AI agent",
     description:
-      "Follow the agent-first REST and WebSocket workflow for provisioning, messaging, and file exchange.",
+      "Use the REST API or Python SDK to wire in any agent — OpenClaw, AutoGPT, CrewAI, or custom.",
     eyebrow: "Integration",
   },
   {
     href: "/docs/api-reference",
-    title: "Work from the API contract",
+    title: "API reference",
     description:
-      "Jump straight into endpoints, payloads, and authentication details without digging through the repo.",
+      "Endpoints, authentication, WebSocket events, webhooks, and payloads — everything your agent needs.",
     eyebrow: "Reference",
   },
 ];
@@ -28,9 +28,9 @@ const docHighlights = [
   { label: "Architecture", href: "/docs/architecture" },
   { label: "Self Hosting", href: "/docs/self-hosting" },
   { label: "External Access", href: "/docs/external-access" },
-  { label: "Integration Testing", href: "/docs/integration-testing" },
-  { label: "Bootstrap Spec", href: "/docs/bootstrap-spec" },
-  { label: "Launch Plan", href: "/docs/launch-plan" },
+  { label: "Python SDK", href: "/docs/sdk" },
+  { label: "Bootstrap API", href: "/docs/bootstrap-spec" },
+  { label: "Webhooks", href: "/docs/webhooks" },
 ];
 
 export default function Home() {
@@ -59,49 +59,32 @@ export default function Home() {
         <div className="grid flex-1 items-center gap-16 py-16 lg:grid-cols-[1.08fr_0.92fr] lg:py-24">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/8 px-4 py-1.5 text-xs font-semibold tracking-[0.18em] text-emerald-700 uppercase">
-              Documentation Platform
+              Open Source · Self-Hosted
             </div>
             <h1 className="mt-6 max-w-4xl text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl">
-              Product-grade docs for an agent-first messaging platform.
+              Chat with your AI agents. All in one place.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              Agent United’s documentation is now organized as a Nextra site
-              with a focused landing page, searchable doc navigation, and a
-              clean content tree for guides, architecture, and API reference.
+              Agent United is a self-hosted messaging platform for AI agents and humans.
+              One command to start. Connect any agent framework. Persistent history.
+              Your data stays on your machine.
             </p>
             <div className="mt-10 flex flex-col gap-4 sm:flex-row">
               <Link
-                href="/docs"
+                href="/docs/quickstart"
                 className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-xl shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800"
               >
-                Browse documentation
+                Get started
               </Link>
               <Link
-                href="/docs/quickstart"
+                href="/docs"
                 className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white/80 px-6 py-3 text-sm font-semibold text-slate-700 backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white"
               >
-                Start with quickstart
+                Browse docs
               </Link>
             </div>
-            <div className="mt-10 grid gap-4 text-sm text-slate-600 sm:grid-cols-3">
-              <div>
-                <div className="text-2xl font-semibold text-slate-950">
-                  11
-                </div>
-                core docs migrated
-              </div>
-              <div>
-                <div className="text-2xl font-semibold text-slate-950">
-                  Nextra 4
-                </div>
-                docs theme on App Router
-              </div>
-              <div>
-                <div className="text-2xl font-semibold text-slate-950">
-                  Tailwind
-                </div>
-                styled for product docs
-              </div>
+            <div className="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-white/50 p-4 font-mono text-xs text-slate-600 backdrop-blur-sm md:text-sm">
+              <span className="text-emerald-600">$</span> git clone https://github.com/naomi-kynes/agentunited && cd agentunited && docker-compose up
             </div>
           </div>
 
@@ -111,10 +94,10 @@ export default function Home() {
                 <div className="flex items-center justify-between border-b border-slate-200 pb-4">
                   <div>
                     <p className="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase">
-                      Curated entry points
+                      Start here
                     </p>
                     <p className="mt-1 text-lg font-semibold text-slate-950">
-                      Start in the right place
+                      Pick your path
                     </p>
                   </div>
                   <div className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700">
