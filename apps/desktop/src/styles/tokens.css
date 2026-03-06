@@ -1,31 +1,31 @@
 /* Agent United Design Tokens - macOS Desktop App */
 
 :root {
-  /* Primary brand colors */
-  --color-rust: #D97548;
-  --color-amber-warm: #E8A968;
-  --color-crt-glow: #FFB84D;
-  --color-steel-blue: #7A9CAB;
+  /* Primary brand colors — Foundation of Rock V2 */
+  --color-rust: #1ee0e0;
+  --color-amber-warm: #5ceaea;
+  --color-crt-glow: #1ee0e0;
+  --color-steel-blue: #a1a1aa;
   
   /* Semantic colors */
-  --color-agent: #FFB84D;
-  --color-human: #7A9CAB;
-  --color-success: #7D9973;
-  --color-warning: #E8A968;
-  --color-danger: #C4655F;
+  --color-agent: #1ee0e0;
+  --color-human: #d4d4d8;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
   
   /* Neutrals (dark mode - primary) */
-  --color-bg-primary: #2E2D2B;
-  --color-bg-secondary: #3A3836;
-  --color-bg-tertiary: #474441;
-  --color-bg-elevated: #3E3C39;
+  --color-bg-primary: #09090b;
+  --color-bg-secondary: #18181b;
+  --color-bg-tertiary: #27272a;
+  --color-bg-elevated: #18181b;
   
-  --color-border: rgba(90, 86, 84, 0.2);
-  --color-border-hover: rgba(90, 86, 84, 0.4);
+  --color-border: rgba(63, 63, 70, 0.7);
+  --color-border-hover: rgba(82, 82, 91, 0.9);
   
-  --color-text-primary: #F5F3EF;
-  --color-text-secondary: #C4BFB8;
-  --color-text-muted: #8A8581;
+  --color-text-primary: #fafafa;
+  --color-text-secondary: #d4d4d8;
+  --color-text-muted: #a1a1aa;
   
   /* Neutrals (light mode - secondary) */
   --color-bg-primary-light: #F5F3EF;
@@ -93,7 +93,7 @@
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-focus: 0 0 0 3px rgba(217, 117, 72, 0.3);
+  --shadow-focus: 0 0 0 3px rgba(30, 224, 224, 0.35);
 }
 
 /* Animation tokens */

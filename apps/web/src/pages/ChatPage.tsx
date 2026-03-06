@@ -234,6 +234,56 @@ export function ChatPage() {
     setShowMembersPanel(prev => !prev);
   }, []);
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // CMD/CTRL + K to open search
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearching(true);
+        // Dispatch custom event to focus the sidebar input
+        window.dispatchEvent(new CustomEvent('focus-chat-search'));
+      }
+      
+      // ALT + N to create new channel
+      if (e.altKey && e.key === 'n') {
+        e.preventDefault();
+        setShowCreateChannel(true);
+      }
+
+      // ALT + D to start new DM
+      if (e.altKey && e.key === 'd') {
+        e.preventDefault();
+        setShowNewDM(true);
+      }
+
+      // ESC to close modals/search
+      if (e.key === 'Escape') {
+        if (isSearching) handleCloseSearch();
+        if (showCreateChannel) setShowCreateChannel(false);
+        if (showNewDM) setShowNewDM(false);
+        if (showMembersPanel) setShowMembersPanel(false);
+      }
+
+      // '/' to focus chat input
+      if (e.key === '/' && !isSearching && !showCreateChannel && !showNewDM) {
+        // Only if we aren't already typing in an input
+        const activeElement = document.activeElement;
+        const isTyping = activeElement instanceof HTMLInputElement || 
+                         activeElement instanceof HTMLTextAreaElement;
+        
+        if (!isTyping) {
+          e.preventDefault();
+          const chatInput = document.querySelector('.chat-message-input textarea') as HTMLTextAreaElement;
+          chatInput?.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearching, showCreateChannel, showNewDM, showMembersPanel, handleCloseSearch]);
+
   const handleMessageUpdated = useCallback((messageId: string, newContent: string) => {
     // TODO: Update the message in local state when WebSocket integration is enhanced
     // For now, we rely on the API call in MessageItem
@@ -364,6 +414,7 @@ export function ChatPage() {
                 ? `Message ${selectedDM?.name || 'user'}`
                 : `Message #${selectedChannel?.name || 'general'}`
               }
+              className="chat-message-input"
             />
           </>
         )}

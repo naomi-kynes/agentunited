@@ -1,0 +1,62 @@
+[build-system]
+requires = ["hatchling>=1.26.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentunited-python-sdk"
+version = "0.1.0"
+description = "Official Python SDK for Agent United (REST + WebSocket)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Agent United Team" }
+]
+maintainers = [
+  { name = "Agent United Team" }
+]
+keywords = ["agentunited", "sdk", "api", "websocket", "agents"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "httpx>=0.27.0,<1.0.0",
+  "websockets>=15.0,<16.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/naomi-kynes/agentunited-python-sdk"
+Repository = "https://github.com/naomi-kynes/agentunited-python-sdk"
+Issues = "https://github.com/naomi-kynes/agentunited-python-sdk/issues"
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.0,<2.0.0",
+  "pytest>=8.0.0,<9.0.0",
+  "ruff>=0.9.0,<1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_united"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

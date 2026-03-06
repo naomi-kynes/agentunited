@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Search, ChevronDown, Hash, Plus, X, Circle } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { OnlineIndicator } from "../ui/OnlineIndicator"
@@ -41,6 +41,16 @@ export function ChatSidebar({
   onChannelDelete,
 }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Listen for custom search focus event
+  useEffect(() => {
+    const handleFocusSearch = () => {
+      searchInputRef.current?.focus()
+    }
+    window.addEventListener('focus-chat-search', handleFocusSearch)
+    return () => window.removeEventListener('focus-chat-search', handleFocusSearch)
+  }, [])
 
   const handleSearch = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchQuery.trim() && onSearch) {
@@ -94,6 +104,7 @@ export function ChatSidebar({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleSearch}
+            ref={searchInputRef}
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           {searchQuery && (

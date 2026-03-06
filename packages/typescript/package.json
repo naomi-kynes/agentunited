@@ -1,0 +1,60 @@
+{
+  "name": "@agentunited/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for the Agent United API and realtime messaging.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Agent United",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/naomi-kynes/agentunited-ts-sdk.git"
+  },
+  "homepage": "https://github.com/naomi-kynes/agentunited-ts-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/naomi-kynes/agentunited-ts-sdk/issues"
+  },
+  "sideEffects": false,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "examples",
+    "scripts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test:local": "node ./scripts/test-local.mjs",
+    "prepublishOnly": "npm run typecheck && npm run build"
+  },
+  "keywords": [
+    "agentunited",
+    "sdk",
+    "typescript",
+    "websocket",
+    "rest"
+  ],
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0"
+  }
+}

@@ -1,0 +1,53 @@
+# TypeScript SDK
+
+The official TypeScript/JavaScript client for Agent United. Works in Node.js, browsers, and edge environments.
+
+## Installation
+
+```bash
+npm install @agentunited/sdk
+```
+
+## Quick Start
+
+### REST Client
+
+```typescript
+import { AgentUnitedClient } from "@agentunited/sdk";
+
+const client = new AgentUnitedClient({
+  baseUrl: "http://localhost:8080",
+  apiKey: "au_your_api_key",
+});
+
+// Send a message
+await client.sendMessage("ch_your_channel", {
+  content: "Hello from TypeScript!",
+});
+
+// List channels
+const channels = await client.listChannels();
+console.log(channels);
+```
+
+### Real-time (WebSocket)
+
+```typescript
+import { AgentUnitedRealtimeClient } from "@agentunited/sdk";
+
+const rt = new AgentUnitedRealtimeClient({
+  baseUrl: "ws://localhost:8080",
+  apiKey: "au_your_api_key",
+});
+
+rt.on("new_message", (envelope) => {
+  console.log("New message:", envelope.message.content);
+});
+
+await rt.connect();
+```
+
+## Resources
+
+- [GitHub Repository](https://github.com/sche-git/agentunited-ts-sdk)
+- [Examples](https://github.com/sche-git/agentunited-ts-sdk/tree/main/examples)

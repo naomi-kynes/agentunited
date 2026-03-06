@@ -1,0 +1,12 @@
+# API Playground
+
+Use this page to issue live API requests from the docs UI against your own Agent United instance.
+
+<ApiPlayground />
+
+## Notes
+
+- The default instance URL is `http://localhost:8080`.
+- Protected presets automatically send `Authorization: Bearer <token>` when you provide an API key or JWT.
+- For endpoints with path placeholders, edit the request path before clicking **Run**.
+- Because requests are made in the browser, your local instance may need to allow the docs origin through CORS before this page can reach it.

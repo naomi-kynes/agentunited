@@ -5,6 +5,9 @@ import { LoginPage } from './pages/LoginPage';
 import { InviteAcceptPage } from './pages/InviteAcceptPage';
 import { ChatPage } from './pages/ChatPage';
 import { AgentFoundationSettingsPage } from './pages/AgentFoundationSettingsPage';
+import { DashboardHomePage } from './pages/DashboardHomePage';
+import { TunnelDashboardPage } from './pages/TunnelDashboardPage';
+import { PairInstancePage } from './pages/PairInstancePage';
 import { initializeFromUrlParams } from './services/apiConfig';
 import { AuthService, autoLogin } from './services/authService';
 
@@ -99,6 +102,30 @@ function App() {
           element={
             <ProtectedRoute>
               <AgentFoundationSettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardHomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/tunnel"
+          element={
+            <ProtectedRoute>
+              <TunnelDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/pair-instance"
+          element={
+            <ProtectedRoute>
+              <PairInstancePage />
             </ProtectedRoute>
           }
         />

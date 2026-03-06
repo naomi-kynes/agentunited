@@ -16,12 +16,14 @@ interface MessageInputProps {
   onSend: (message: string, mentions?: { userId: string; display: string }[], attachment?: File) => void;
   members?: Member[];
   placeholder?: string;
+  className?: string;
 }
 
 export function MessageInput({ 
   onSend, 
   members = [], 
-  placeholder = "Message #general" 
+  placeholder = "Message #general",
+  className
 }: MessageInputProps) {
   const [value, setValue] = useState("")
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -188,7 +190,7 @@ export function MessageInput({
 
   return (
     <>
-      <div className="border-t border-border bg-card px-5 py-3">
+      <div className={cn("border-t border-border bg-card px-5 py-3", className)}>
         {/* File attachment preview */}
         {selectedFile && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">

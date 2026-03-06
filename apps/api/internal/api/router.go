@@ -101,8 +101,8 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	r.Post("/api/v1/bootstrap", bootstrapHandler.ServeHTTP)
 	r.Get("/api/v1/invite", inviteHandler.ValidateInvite)
 	r.Post("/api/v1/invite/accept", inviteHandler.AcceptInvite)
-
-	// Pairing routes for M5 Tunneling
+	
+	// Pairing routes for M5 Tunneling (Publicly accessible from local web UI)
 	r.Get("/api/v1/pairing/code", pairingHandler.GetCode)
 	r.Get("/api/v1/pairing/verify", pairingHandler.VerifyCode)
 
