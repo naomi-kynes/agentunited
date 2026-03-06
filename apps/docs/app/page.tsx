@@ -43,8 +43,8 @@ export default function Home() {
             href="/"
             className="inline-flex items-center gap-3 text-sm font-semibold tracking-[0.18em] text-slate-900 uppercase"
           >
-            <span className="inline-flex size-9 items-center justify-center rounded-2xl bg-slate-950 text-sm text-white shadow-lg shadow-emerald-500/20">
-              AU
+            <span className="inline-flex size-9 items-center justify-center rounded-full border border-slate-950/50 shadow-[0_0_12px_rgba(16,185,129,0.4)]">
+              <span className="h-2.5 w-2.5 rounded-full bg-slate-950" />
             </span>
             Agent United Docs
           </Link>
