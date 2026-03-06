@@ -42,3 +42,9 @@ coverage/
 tmp/
 temp/
 agent-united-research
+
+# Internal/private - do not commit to public repo
+design-reference/
+specs/
+integrations/openclaw-skill/
+agent-united-research/
