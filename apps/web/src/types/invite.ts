@@ -8,6 +8,7 @@ export interface InviteInfo {
 export interface InviteAcceptRequest {
   token: string;
   password: string;
+  display_name?: string;
 }
 
 export interface InviteAcceptResponse {

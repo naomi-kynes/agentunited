@@ -10,17 +10,20 @@ export function InviteAcceptPage() {
   const token = searchParams.get('token');
 
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
+  const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [displayNameError, setDisplayNameError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
 
+  const isValidDisplayName = displayName.trim().length >= 1 && displayName.trim().length <= 50;
   const isValidPassword = password.length >= 12;
   const passwordsMatch = password === confirmPassword;
-  const canSubmit = isValidPassword && passwordsMatch && !submitting;
+  const canSubmit = isValidDisplayName && isValidPassword && passwordsMatch && !submitting;
 
   useEffect(() => {
     // Initialize instance URL from URL params before any API calls
@@ -37,6 +40,7 @@ export function InviteAcceptPage() {
       try {
         const info = await getInviteInfo(token);
         setInviteInfo(info);
+        setDisplayName((info.display_name || '').trim());
         setError(null);
       } catch (err) {
         if (err instanceof InviteApiError) {
@@ -51,6 +55,20 @@ export function InviteAcceptPage() {
 
     fetchInviteInfo();
   }, [token]);
+
+  const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.value;
+    setDisplayName(next);
+
+    const trimmed = next.trim();
+    if (!trimmed) {
+      setDisplayNameError('Display name is required');
+    } else if (trimmed.length > 50) {
+      setDisplayNameError('Display name must be 50 characters or less');
+    } else {
+      setDisplayNameError(null);
+    }
+  };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newPassword = e.target.value;
@@ -81,11 +99,17 @@ export function InviteAcceptPage() {
       return;
     }
 
+    const trimmedDisplayName = displayName.trim();
+    if (!trimmedDisplayName || trimmedDisplayName.length > 50) {
+      setDisplayNameError('Display name is required (1–50 chars)');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
     try {
-      const response = await acceptInvite({ token, password });
+      const response = await acceptInvite({ token, password, display_name: trimmedDisplayName });
       localStorage.setItem('auth-token', response.jwt_token);
       navigate('/chat');
     } catch (err) {
@@ -143,7 +167,7 @@ export function InviteAcceptPage() {
                     Invited by <span className="font-semibold text-slate-900">{inviteInfo.inviter}</span>
                   </p>
                   <p className="mt-1 text-slate-600">
-                    Email: <span className="font-medium text-slate-900">{inviteInfo.email}</span>
+                    This invite is for <span className="font-medium text-slate-900">{inviteInfo.email}</span>
                   </p>
                 </div>
               )}
@@ -153,6 +177,27 @@ export function InviteAcceptPage() {
               )}
 
               <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold tracking-[0.1em] text-slate-600 uppercase">Email</label>
+                  <div className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-700">
+                    {inviteInfo?.email || '—'}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold tracking-[0.1em] text-slate-600 uppercase">Display name</label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={handleDisplayNameChange}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-400/60 focus:ring-4 focus:ring-emerald-500/10"
+                    placeholder="How should we call you?"
+                    maxLength={50}
+                    required
+                  />
+                  {displayNameError && <p className="mt-1 text-xs text-red-500">{displayNameError}</p>}
+                </div>
+
                 <div>
                   <label className="mb-1.5 block text-xs font-semibold tracking-[0.1em] text-slate-600 uppercase">Password</label>
                   <input
