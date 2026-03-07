@@ -22,6 +22,13 @@ interface ApiChannel {
   unread_count?: number;
 }
 
+interface ApiAgent {
+  id: string;
+  name: string;
+  display_name?: string;
+  email?: string;
+}
+
 interface SendMessageRequest {
   text: string;
 }
@@ -159,7 +166,7 @@ export const chatApi = {
   async createChannel(name: string, description?: string): Promise<Channel> {
     try {
       const body: Record<string, string> = { name };
-      if (description) body.description = description;
+      if (description) body.topic = description;
       const response = await apiRequest<{ channel: ApiChannel }>(
         '/api/v1/channels',
         {
@@ -274,6 +281,19 @@ export const chatApi = {
       `/api/v1/dm/${dmId}/read`,
       { method: 'POST', body: JSON.stringify(body) }
     );
+  },
+
+  async addChannelMember(channelId: string, userId: string, role: 'member' | 'observer' = 'member'): Promise<void> {
+    await apiRequest<void>(
+      `/api/v1/channels/${channelId}/members`,
+      { method: 'POST', body: JSON.stringify({ user_id: userId, role }) }
+    );
+  },
+
+  async getAgents(): Promise<ApiAgent[]> {
+    const response = await apiRequest<{ agents?: ApiAgent[] } | ApiAgent[]>('/api/v1/agents');
+    if (Array.isArray(response)) return response;
+    return response.agents || [];
   },
 
   /**

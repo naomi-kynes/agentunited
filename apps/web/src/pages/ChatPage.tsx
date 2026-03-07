@@ -41,6 +41,7 @@ export function ChatPage() {
   const [showNewDM, setShowNewDM] = useState(false);
   const [showMembersPanel, setShowMembersPanel] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [channelCreateWarning, setChannelCreateWarning] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [channelMembers, setChannelMembers] = useState<{ id: string; name: string; email: string; type: 'agent' | 'human'; online: boolean }[]>([]);
@@ -191,11 +192,28 @@ export function ChatPage() {
     void markConversationRead('dm', dmId);
   };
 
-  const handleCreateChannel = useCallback(async (name: string, description: string) => {
+  const handleCreateChannel = useCallback(async (name: string, description: string, selectedAgentIds: string[] = []) => {
     const newChannel = await chatApi.createChannel(name, description);
+
+    let failedInvites = 0;
+    for (const agentId of selectedAgentIds) {
+      try {
+        await chatApi.addChannelMember(newChannel.id, agentId, 'member');
+      } catch (error) {
+        failedInvites += 1;
+        console.error(`Failed to invite agent ${agentId}:`, error);
+      }
+    }
+
     setChannels(prev => [...prev, newChannel]);
     setSelectedChannelId(newChannel.id);
     setSelectedDMId(''); // Clear DM selection
+
+    if (failedInvites > 0) {
+      setChannelCreateWarning(`Channel created, but ${failedInvites} agent invite(s) failed. You can retry from channel settings.`);
+    } else {
+      setChannelCreateWarning(null);
+    }
   }, []);
 
   const handleSearch = useCallback((query: string) => {
@@ -270,6 +288,12 @@ export function ChatPage() {
       void markConversationRead('channel', selectedChannelId);
     }
   }, [selectedChannelId, selectedDMId, markConversationRead]);
+
+  useEffect(() => {
+    if (!channelCreateWarning) return;
+    const timeout = window.setTimeout(() => setChannelCreateWarning(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [channelCreateWarning]);
 
   useEffect(() => {
     const onFocus = () => {
@@ -462,6 +486,12 @@ export function ChatPage() {
       >
         <div className="flex-1 flex flex-col">
           <ConnectionBanner status={connectionStatus} error={wsError} />
+
+          {channelCreateWarning && (
+            <div className="border-b border-amber-400/25 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+              {channelCreateWarning}
+            </div>
+          )}
 
           {isSearching ? (
             // Show search results instead of normal chat

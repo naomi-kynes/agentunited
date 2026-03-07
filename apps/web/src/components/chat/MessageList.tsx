@@ -52,7 +52,9 @@ export function MessageList({
           <h3 className="text-lg font-semibold tracking-tight text-foreground">
             {isDM ? `Welcome to ${label}.` : `Welcome to #${label}.`}
           </h3>
-          <p className="mt-1 text-sm text-muted-foreground">No messages yet. Start the conversation below.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isDM ? 'No messages yet. Say something!' : 'No messages yet — say something!'}
+          </p>
         </div>
       </div>
     )
