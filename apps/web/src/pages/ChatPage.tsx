@@ -459,6 +459,10 @@ export function ChatPage() {
             setSidebarOpen(false);
             navigate('/settings/profile');
           }}
+          onOpenIntegrations={() => {
+            setSidebarOpen(false);
+            navigate('/settings/integrations');
+          }}
         />
       </ErrorBoundary>
 

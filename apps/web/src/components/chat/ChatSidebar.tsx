@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Search, ChevronDown, Hash, Plus, Settings, X } from "lucide-react"
+import { Search, ChevronDown, Hash, Plus, Plug, Settings, X } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { OnlineIndicator } from "../ui/OnlineIndicator"
 import { TypeBadge } from "../ui/TypeBadge"
@@ -29,6 +29,7 @@ interface ChatSidebarProps {
   onChannelUpdate?: (channel: Channel) => void
   onChannelDelete?: (channelId: string) => void
   onOpenSettings?: () => void
+  onOpenIntegrations?: () => void
 }
 
 export function ChatSidebar({
@@ -44,6 +45,7 @@ export function ChatSidebar({
   onChannelUpdate,
   onChannelDelete,
   onOpenSettings,
+  onOpenIntegrations,
 }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -235,6 +237,13 @@ export function ChatSidebar({
         >
           <Settings className="h-4 w-4" />
           <span>Profile settings</span>
+        </button>
+        <button
+          onClick={onOpenIntegrations}
+          className="mt-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+        >
+          <Plug className="h-4 w-4" />
+          <span>Integrations</span>
         </button>
       </div>
     </aside>

@@ -9,6 +9,7 @@ import { DashboardHomePage } from './pages/DashboardHomePage';
 import { TunnelDashboardPage } from './pages/TunnelDashboardPage';
 import { PairInstancePage } from './pages/PairInstancePage';
 import { UserSettingsPage } from './pages/UserSettingsPage';
+import { IntegrationSettingsPage } from './pages/IntegrationSettingsPage';
 import { initializeFromUrlParams } from './services/apiConfig';
 import { AuthService, autoLogin } from './services/authService';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
@@ -133,6 +134,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <UserSettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/integrations"
+            element={
+              <ProtectedRoute>
+                <IntegrationSettingsPage />
               </ProtectedRoute>
             }
           />
