@@ -66,13 +66,13 @@ jobs:
             -d '{"name":"ci-test","topic":"CI test channel"}')
           [ "$code" = "201" ] || { cat /tmp/channel.json; exit 1; }
           CHANNEL_ID=$(jq -r '.channel.id // .id // empty' /tmp/channel.json)
-          [ -n "$CHANNEL_ID" ] || { cat /tmp/channel.json; exit 1; }
+          [ -n "$CHANNEL_ID" ] && [ "$CHANNEL_ID" != "null" ] || { cat /tmp/channel.json; exit 1; }
 
           code=$(curl -s -o /tmp/message.json -w '%{http_code}' -X POST $BASE/channels/$CHANNEL_ID/messages \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"text":"hello from CI"}')
-          [ "$code" = "201" ] || { cat /tmp/message.json; exit 1; }
+          [ "$code" = "201" ] || { cat /tmp/message.json; docker compose logs api; exit 1; }
 
           echo "All smoke tests passed ✅"
 
