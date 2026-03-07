@@ -31,6 +31,7 @@ type WebhookService interface {
 	DeleteWebhook(ctx context.Context, webhookID, agentID, ownerID string) error
 	ListDeliveries(ctx context.Context, webhookID, agentID, ownerID string, limit int) ([]*models.WebhookDelivery, error)
 	DispatchEvent(ctx context.Context, channelID, eventType string, payload map[string]interface{})
+	DispatchSigned(ctx context.Context, url, eventType, integrationID string, payload []byte, signature string)
 }
 
 type webhookService struct {
@@ -226,7 +227,7 @@ func (s *webhookService) attemptDelivery(webhook *models.WebhookWithSecret, deli
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "AgentUnited-Webhooks/1.0")
 	req.Header.Set("X-AgentUnited-Event", delivery.EventType)
-	
+
 	// Generate HMAC signature
 	signature := generateHMACSignature(payloadBytes, webhook.Secret)
 	req.Header.Set("X-AgentUnited-Signature", signature)
@@ -275,4 +276,35 @@ func intPtr(i int) *int {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+// DispatchSigned sends a signed webhook payload (used by integration manager).
+func (s *webhookService) DispatchSigned(ctx context.Context, url, eventType, integrationID string, payload []byte, signature string) {
+	go func() {
+		maxAttempts := 3
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			req, err := http.NewRequestWithContext(context.Background(), "POST", url, bytes.NewReader(payload))
+			if err != nil {
+				return
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("User-Agent", "AgentUnited-Integrations/1.0")
+			req.Header.Set("X-AgentUnited-Event", eventType)
+			req.Header.Set("X-AgentUnited-Integration-ID", integrationID)
+			req.Header.Set("X-AgentUnited-Signature", signature)
+
+			client := &http.Client{Timeout: 30 * time.Second}
+			resp, err := client.Do(req)
+			if err == nil {
+				io.Copy(io.Discard, io.LimitReader(resp.Body, 512))
+				resp.Body.Close()
+				if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+					return
+				}
+			}
+			if attempt < maxAttempts {
+				time.Sleep(time.Duration(1<<attempt) * time.Second)
+			}
+		}
+	}()
 }

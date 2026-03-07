@@ -12,6 +12,7 @@ import (
 	"github.com/agentunited/backend/internal/models"
 	"github.com/agentunited/backend/internal/service"
 	"github.com/agentunited/backend/internal/utils"
+	"github.com/agentunited/backend/pkg/integrations"
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog/log"
 )
@@ -26,20 +27,30 @@ type Broadcaster interface {
 	Broadcast(ctx context.Context, channelID string, message []byte)
 }
 
+type IntegrationEventRouter interface {
+	RouteEvent(ctx context.Context, event integrations.Event) error
+}
+
 type MessageHandler struct {
-	messageService service.MessageService
-	webhookService service.WebhookService
-	hub            Broadcaster
-	realtime       RealtimePublisher
+	messageService    service.MessageService
+	webhookService    service.WebhookService
+	hub               Broadcaster
+	realtime          RealtimePublisher
+	integrationRouter IntegrationEventRouter
 }
 
 // NewMessageHandler creates a new message handler
-func NewMessageHandler(messageService service.MessageService, webhookService service.WebhookService, hub Broadcaster, rt RealtimePublisher) *MessageHandler {
+func NewMessageHandler(messageService service.MessageService, webhookService service.WebhookService, hub Broadcaster, rt RealtimePublisher, routers ...IntegrationEventRouter) *MessageHandler {
+	var router IntegrationEventRouter
+	if len(routers) > 0 {
+		router = routers[0]
+	}
 	return &MessageHandler{
-		messageService: messageService,
-		webhookService: webhookService,
-		hub:            hub,
-		realtime:       rt,
+		messageService:    messageService,
+		webhookService:    webhookService,
+		hub:               hub,
+		realtime:          rt,
+		integrationRouter: router,
 	}
 }
 
@@ -174,6 +185,16 @@ func (h *MessageHandler) Send(w http.ResponseWriter, r *http.Request) {
 		"created_at":      finalMessage.CreatedAt,
 	}
 	h.webhookService.DispatchEvent(ctx, channelID, "message.created", webhookPayload)
+
+	if h.integrationRouter != nil {
+		_ = h.integrationRouter.RouteEvent(ctx, integrations.Event{
+			Type:        "message.created",
+			WorkspaceID: userID,
+			ChannelID:   channelID,
+			Payload:     webhookPayload,
+			OccurredAt:  finalMessage.CreatedAt,
+		})
+	}
 
 	// Populate author display info for broadcast
 	if finalMessage.AuthorEmail == "" {

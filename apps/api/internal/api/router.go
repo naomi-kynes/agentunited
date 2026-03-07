@@ -65,6 +65,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	agentRepo := repository.NewAgentRepository(db)
 	apiKeyRepo := repository.NewAPIKeyRepository(db)
 	webhookRepo := repository.NewWebhookRepository(db)
+	integrationRepo := repository.NewIntegrationRepository(db)
 	inviteRepo := repository.NewInviteRepository(db)
 
 	// Initialize services
@@ -75,6 +76,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	agentService := service.NewAgentService(agentRepo)
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, agentRepo)
 	webhookService := service.NewWebhookService(webhookRepo, agentRepo)
+	integrationService := service.NewIntegrationService(integrationRepo, webhookService)
 	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, cfg.JWT.Secret, "http://localhost:8080")
 	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret)
 
@@ -85,7 +87,8 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	authHandler := handlers.NewAuthHandler(authService)
 	meHandler := handlers.NewMeHandler(authService)
 	channelHandler := handlers.NewChannelHandler(channelService)
-	messageHandler := handlers.NewMessageHandler(messageService, webhookService, hub, realtimeEngine)
+	messageHandler := handlers.NewMessageHandler(messageService, webhookService, hub, realtimeEngine, integrationService)
+	integrationHandler := handlers.NewIntegrationHandler(integrationService)
 	agentHandler := handlers.NewAgentHandler(agentService)
 	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyService)
 	webhookHandler := handlers.NewWebhookHandler(webhookService)
@@ -121,6 +124,11 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/me", meHandler.GetMe)
 		r.Put("/me", meHandler.UpdateMe)
 		r.Post("/me/password", meHandler.ChangePassword)
+
+		// Integrations routes
+		r.Get("/integrations", integrationHandler.List)
+		r.Post("/integrations", integrationHandler.Create)
+		r.Delete("/integrations/{id}", integrationHandler.Delete)
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
@@ -201,6 +209,11 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/me", meHandler.GetMe)
 		r.Put("/me", meHandler.UpdateMe)
 		r.Post("/me/password", meHandler.ChangePassword)
+
+		// Integrations routes
+		r.Get("/integrations", integrationHandler.List)
+		r.Post("/integrations", integrationHandler.Create)
+		r.Delete("/integrations/{id}", integrationHandler.Delete)
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
