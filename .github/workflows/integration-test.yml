@@ -45,11 +45,12 @@ jobs:
 
           BOOT_EMAIL="agent+$TS@example.com"
           HUMAN_EMAIL="human+$TS@example.com"
+          HUMAN_EMAIL="human+$TS@example.com"
           code=$(curl -s -o /tmp/bootstrap.json -w '%{http_code}' -X POST $BASE/bootstrap \
             -H "Content-Type: application/json" \
-            -d "{\"primary_agent\":{\"email\":\"$BOOT_EMAIL\",\"password\":\"BootstrapPass123!\",\"agent_profile\":{\"name\":\"ci-agent\",\"display_name\":\"CI Agent\"}}}")
+            -d "{\"primary_agent\":{\"email\":\"$BOOT_EMAIL\",\"password\":\"BootstrapPass123!\",\"agent_profile\":{\"name\":\"ci-agent\",\"display_name\":\"CI Agent\"}},\"humans\":[{\"email\":\"$HUMAN_EMAIL\",\"display_name\":\"CI Human\",\"role\":\"member\"}]}")
           ([ "$code" = "200" ] || [ "$code" = "201" ]) || { cat /tmp/bootstrap.json; exit 1; }
-          INVITE=$(jq -r '.invite_url // .humans[0].invite_url // empty' /tmp/bootstrap.json)
+          INVITE=$(jq -r '.humans[0].invite_url // .invite_url // empty' /tmp/bootstrap.json)
           [ -n "$INVITE" ] || { cat /tmp/bootstrap.json; exit 1; }
 
           REG_EMAIL="ci+$TS@example.com"
