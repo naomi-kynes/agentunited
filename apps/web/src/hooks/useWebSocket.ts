@@ -95,15 +95,29 @@ export function useWebSocket(_url: string, channelId: string): UseWebSocketRetur
 
           if (data.type === 'message' || data.type === 'new_message' || data.type === 'message.created') {
             const d = data.data || data; // message.created wraps in { type, data }
+            const authorId = d.author_id || d.message?.author_id || '';
+            const isOwnMessage = authorId === localStorage.getItem('user-id');
+
+            const rawAuthorLabel =
+              d.author_email ||
+              d.author_display_name ||
+              d.author_name ||
+              d.message?.author_email ||
+              d.message?.author_display_name ||
+              d.message?.author_name ||
+              (isOwnMessage ? localStorage.getItem('user-email') : '') ||
+              authorId ||
+              'Unknown';
+
             const msg: Message = {
               id: d.id || d.message_id || d.message?.id || `ws-${Date.now()}`,
               channelId: d.channel_id || d.message?.channel_id || channelId,
-              author: getDisplayName(d.author_email || d.author_type || 'Unknown'),
-              authorId: d.author_id || d.message?.author_id || '',
-              authorType: (d.author_type === 'agent') ? 'agent' : 'human',
+              author: getDisplayName(rawAuthorLabel),
+              authorId,
+              authorType: ((d.author_type || d.message?.author_type) === 'agent') ? 'agent' : 'human',
               text: d.text || d.message?.text || '',
               timestamp: d.created_at || d.message?.created_at || new Date().toISOString(),
-              isOwnMessage: d.author_id === localStorage.getItem('user-id'),
+              isOwnMessage,
             };
 
             // Only add if it's for the current channel
