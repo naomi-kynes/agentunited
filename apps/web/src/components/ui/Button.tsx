@@ -17,7 +17,7 @@ export function Button({
   const baseClasses = 'px-4 py-2 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
+    primary: 'bg-primary text-primary-foreground hover:bg-primary/90 focus:ring-primary/50',
     secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80 focus:ring-ring',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   };
