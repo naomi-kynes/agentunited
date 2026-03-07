@@ -39,8 +39,8 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 	if user.ID != "" {
 		// Use provided ID (for bootstrap scenarios)
 		query = `
-			INSERT INTO users (id, email, display_name, avatar_url, password_hash, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO users (id, email, display_name, avatar_url, user_type, password_hash, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			RETURNING created_at, updated_at
 		`
 		err = r.db.Pool.QueryRow(
@@ -50,6 +50,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 			user.Email,
 			user.DisplayName,
 			user.AvatarURL,
+			defaultUserType(user.UserType),
 			user.PasswordHash,
 			user.CreatedAt,
 			user.UpdatedAt,
@@ -57,8 +58,8 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 	} else {
 		// Let database generate ID
 		query = `
-			INSERT INTO users (email, display_name, avatar_url, password_hash, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO users (email, display_name, avatar_url, user_type, password_hash, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			RETURNING id, created_at, updated_at
 		`
 		err = r.db.Pool.QueryRow(
@@ -67,6 +68,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 			user.Email,
 			user.DisplayName,
 			user.AvatarURL,
+			defaultUserType(user.UserType),
 			user.PasswordHash,
 			user.CreatedAt,
 			user.UpdatedAt,
@@ -88,7 +90,7 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 // GetByEmail retrieves a user by email address
 func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
-		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), password_hash, created_at, updated_at
+		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), COALESCE(user_type, 'human'), password_hash, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -99,6 +101,7 @@ func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (
 		&user.Email,
 		&user.DisplayName,
 		&user.AvatarURL,
+		&user.UserType,
 		&user.PasswordHash,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -117,7 +120,7 @@ func (r *PostgresUserRepository) GetByEmail(ctx context.Context, email string) (
 // GetByID retrieves a user by ID
 func (r *PostgresUserRepository) GetByID(ctx context.Context, id string) (*models.User, error) {
 	query := `
-		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), password_hash, created_at, updated_at
+		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), COALESCE(user_type, 'human'), password_hash, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -128,6 +131,7 @@ func (r *PostgresUserRepository) GetByID(ctx context.Context, id string) (*model
 		&user.Email,
 		&user.DisplayName,
 		&user.AvatarURL,
+		&user.UserType,
 		&user.PasswordHash,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -203,7 +207,7 @@ func (r *PostgresUserRepository) Count(ctx context.Context) (int64, error) {
 // List returns all users in the instance.
 func (r *PostgresUserRepository) List(ctx context.Context) ([]*models.User, error) {
 	query := `
-		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), password_hash, created_at, updated_at
+		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), COALESCE(user_type, 'human'), password_hash, created_at, updated_at
 		FROM users
 		ORDER BY created_at DESC
 	`
@@ -217,10 +221,17 @@ func (r *PostgresUserRepository) List(ctx context.Context) ([]*models.User, erro
 	var users []*models.User
 	for rows.Next() {
 		u := &models.User{}
-		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.UserType, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("scan user: %w", err)
 		}
 		users = append(users, u)
 	}
 	return users, nil
+}
+
+func defaultUserType(v string) string {
+	if v == "agent" {
+		return "agent"
+	}
+	return "human"
 }

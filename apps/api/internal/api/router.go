@@ -127,7 +127,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 
 	// Protected API v1 routes (require JWT or API key authentication)
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo))
+		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo, userRepo))
 
 		// Current user profile routes
 		r.Get("/me", meHandler.GetMe)
@@ -220,7 +220,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 
 	// Backward compatibility: Mount protected routes on /v1 as well
 	r.Route("/v1", func(r chi.Router) {
-		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo))
+		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo, userRepo))
 
 		// Current user profile routes
 		r.Get("/me", meHandler.GetMe)

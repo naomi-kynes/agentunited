@@ -119,6 +119,7 @@ func (s *InviteService) CreateInvite(ctx context.Context, email, displayName str
 			ID:           userID,
 			Email:        email,
 			DisplayName:  displayName,
+			UserType:     "human",
 			PasswordHash: "",
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),

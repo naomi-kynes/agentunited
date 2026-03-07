@@ -8,6 +8,7 @@ type User struct {
 	Email        string    `json:"email"`
 	DisplayName  string    `json:"display_name,omitempty"`
 	AvatarURL    string    `json:"avatar_url,omitempty"`
+	UserType     string    `json:"user_type,omitempty"`
 	PasswordHash string    `json:"-"` // Never serialize password hash
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

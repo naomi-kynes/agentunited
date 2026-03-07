@@ -194,8 +194,8 @@ func (r *PostgresMessageRepository) GetByID(ctx context.Context, id string) (*mo
 			m.created_at,
 			m.updated_at,
 			CASE 
-				WHEN m.author_type = 'agent' THEN COALESCE(a.display_name, a.name, '')
-				ELSE COALESCE(u.email, '')
+				WHEN m.author_type = 'agent' THEN COALESCE(NULLIF(a.display_name, ''), NULLIF(a.name, ''), '')
+				ELSE COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1), '')
 			END as author_email
 		FROM messages m
 		LEFT JOIN users u ON m.author_id = u.id AND m.author_type = 'user'
@@ -298,8 +298,8 @@ func (r *PostgresMessageRepository) Search(ctx context.Context, query string, ch
 			m.created_at,
 			m.updated_at,
 			CASE 
-				WHEN m.author_type = 'agent' THEN COALESCE(a.display_name, a.name, '')
-				ELSE COALESCE(u.email, '')
+				WHEN m.author_type = 'agent' THEN COALESCE(NULLIF(a.display_name, ''), NULLIF(a.name, ''), '')
+				ELSE COALESCE(NULLIF(u.display_name, ''), split_part(u.email, '@', 1), '')
 			END as author_email,
 			ts_rank(m.search_vector, plainto_tsquery('english', $1)) as rank
 		FROM messages m

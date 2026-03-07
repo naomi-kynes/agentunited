@@ -19,13 +19,13 @@ type contextKey string
 
 const (
 	// UserIDKey is the context key for user ID
-	UserIDKey     contextKey = "user_id"
-	AgentIDKey    contextKey = "agent_id"
-	AgentNameKey  contextKey = "agent_name"
+	UserIDKey    contextKey = "user_id"
+	AgentIDKey   contextKey = "agent_id"
+	AgentNameKey contextKey = "agent_name"
 )
 
 // Auth creates an authentication middleware that supports both JWT tokens and API keys
-func Auth(jwtSecret string, apiKeyRepo repository.APIKeyRepository, agentRepo repository.AgentRepository) func(http.Handler) http.Handler {
+func Auth(jwtSecret string, apiKeyRepo repository.APIKeyRepository, agentRepo repository.AgentRepository, userRepo repository.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Get token from Authorization header
@@ -66,6 +66,17 @@ func Auth(jwtSecret string, apiKeyRepo repository.APIKeyRepository, agentRepo re
 					log.Error().Err(err).Msg("invalid JWT token")
 					respondUnauthorized(w, "Invalid or expired token")
 					return
+				}
+
+				// If this JWT belongs to an agent-typed user, bind their primary agent context.
+				if user, uerr := userRepo.GetByID(r.Context(), userID); uerr == nil && user.UserType == "agent" {
+					if agents, aerr := agentRepo.ListByOwner(r.Context(), userID); aerr == nil && len(agents) > 0 {
+						agentID = agents[0].ID
+						agentName = agents[0].DisplayName
+						if agentName == "" {
+							agentName = agents[0].Name
+						}
+					}
 				}
 			}
 
@@ -145,15 +156,15 @@ func authenticateJWT(tokenString, jwtSecret string) (string, error) {
 
 // authenticateAPIKey validates an API key and returns the user ID
 type apiKeyResult struct {
-	UserID      string
-	AgentID     string
-	AgentName   string
+	UserID    string
+	AgentID   string
+	AgentName string
 }
 
 func authenticateAPIKey(ctx context.Context, apiKey string, apiKeyRepo repository.APIKeyRepository, agentRepo repository.AgentRepository) (*apiKeyResult, error) {
 	// Hash the provided API key
 	keyHash := hashAPIKey(apiKey)
-	
+
 	// Look up the API key in the database
 	key, err := apiKeyRepo.GetByHash(ctx, keyHash)
 	if err != nil {

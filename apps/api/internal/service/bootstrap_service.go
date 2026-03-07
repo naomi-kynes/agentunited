@@ -79,6 +79,7 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 	primaryUser := &models.User{
 		ID:           primaryUserID,
 		Email:        req.PrimaryAgent.Email,
+		UserType:     "agent",
 		PasswordHash: string(passwordHash),
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
@@ -135,7 +136,7 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 	// Create additional agents
 	for _, agentReq := range req.Agents {
 		agentID := uuid.New().String()
-		
+
 		agent := &models.Agent{
 			ID:          agentID,
 			OwnerID:     primaryUserID,
@@ -170,11 +171,12 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 	// Create human users and invites
 	for _, humanReq := range req.Humans {
 		humanUserID := uuid.New().String()
-		
+
 		// Create user stub (no password yet)
 		humanUser := &models.User{
 			ID:           humanUserID,
 			Email:        humanReq.Email,
+			UserType:     "human",
 			PasswordHash: "", // Empty until invite consumed
 			CreatedAt:    time.Now(),
 			UpdatedAt:    time.Now(),
@@ -301,7 +303,7 @@ func (s *BootstrapService) generateInviteToken() (string, string, error) {
 	}
 
 	token := "inv_" + base64.URLEncoding.EncodeToString(randomBytes)
-	
+
 	hash := sha256.Sum256([]byte(token))
 	tokenHash := fmt.Sprintf("%x", hash)
 

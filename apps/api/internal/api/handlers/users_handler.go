@@ -45,7 +45,11 @@ func (h *UsersHandler) List(w http.ResponseWriter, r *http.Request) {
 		if dn == "" {
 			dn = strings.Split(u.Email, "@")[0]
 		}
-		out = append(out, listItem{ID: u.ID, Email: u.Email, DisplayName: dn, Type: "human"})
+		t := u.UserType
+		if t == "" {
+			t = "human"
+		}
+		out = append(out, listItem{ID: u.ID, Email: u.Email, DisplayName: dn, Type: t})
 	}
 
 	agents, err := h.agentRepo.ListAll(r.Context())
