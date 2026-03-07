@@ -49,13 +49,34 @@ a {
   background: color-mix(in oklab, rgb(16 185 129) 24%, transparent);
 }
 
+/* ─── Docs Home — Light Mode (always, regardless of system preference) ─── */
+
+/* Force the home page to always render in light mode.
+   Nextra and some browser UAs apply prefers-color-scheme media queries that
+   override Tailwind's class-based dark: variants. We pin explicit values here
+   so the home page looks correct at all times in light theme. */
+
+.docs-home .brand,
+.docs-home .top-nav {
+  color: #0f172a;
+}
+
+.docs-home .hero-title {
+  color: #0f172a;
+}
+
+.docs-home .hero-copy {
+  color: #475569;
+}
+
+/* "Pick your path" hero panel — always light */
 .hero-panel {
   position: relative;
-  border: 1px solid rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(15, 23, 42, 0.08);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.55)),
-    radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 38%);
-  box-shadow: 0 24px 80px -48px rgba(15, 23, 42, 0.45);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.85)),
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.1), transparent 38%);
+  box-shadow: 0 24px 80px -48px rgba(15, 23, 42, 0.18);
 }
 
 .hero-panel::before {
@@ -64,12 +85,55 @@ a {
   border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 1.5rem;
   content: "";
+  pointer-events: inner;
   pointer-events: none;
 }
 
-.glow-card {
-  box-shadow: 0 24px 60px -42px rgba(15, 23, 42, 0.35);
+/* Inner path cards — always light */
+.docs-home .glow-card {
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 2px 12px -4px rgba(15, 23, 42, 0.1);
+  color: #0f172a;
 }
+
+.docs-home .glow-card:hover {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+/* "Pick your path" heading + label inside panel — always dark text */
+.docs-home .hero-panel h2,
+.docs-home .hero-panel p {
+  color: #1e293b;
+}
+
+.docs-home .hero-panel .text-\[11px\] {
+  color: #059669;
+}
+
+/* Bottom nav cards — replace dark slate with clean light style */
+.docs-home section a {
+  background: #f8fafc !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
+  color: #334155 !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+
+.docs-home section a:hover {
+  background: #ffffff !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #0f172a !important;
+}
+
+.docs-home section a span.text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+.docs-home section a:hover span {
+  color: #10b981 !important;
+}
+
+/* ─── Dark mode overrides (class-based, for explicit dark toggle) ─── */
 
 html.dark {
   background:
@@ -97,4 +161,22 @@ html.dark .docs-home .hero-copy {
 
 .dark .hero-panel::before {
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .docs-home .glow-card {
+  background: rgba(15, 23, 42, 0.7) !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+  color: #e2e8f0;
+}
+
+html.dark .docs-home section a {
+  background: rgba(15, 23, 42, 0.6) !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+  color: #cbd5e1 !important;
+}
+
+html.dark .docs-home section a:hover {
+  background: rgba(15, 23, 42, 0.8) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #f8fafc !important;
 }
