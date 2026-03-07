@@ -1,4 +1,4 @@
-name: Integration Test (macOS)
+name: Integration Test (Linux)
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    runs-on: [self-hosted, macos-local]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -40,7 +40,7 @@ jobs:
           echo "2. Register user..."
           RESPONSE=$(curl -sf -X POST $BASE/auth/register \
             -H "Content-Type: application/json" \
-            -d '{"email":"ci-mac@test.com","password":"testpass123","display_name":"CI Mac"}')
+            -d '{"email":"ci@test.com","password":"testpass123","display_name":"CI Bot"}')
           TOKEN=$(echo $RESPONSE | jq -r '.token // empty')
           [ -z "$TOKEN" ] && { echo "❌ Register failed: $RESPONSE"; exit 1; }
           echo "✅ Register OK"
@@ -49,7 +49,7 @@ jobs:
           RESPONSE=$(curl -sf -X POST $BASE/channels \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"name":"ci-mac-test","description":"CI macOS test channel"}')
+            -d '{"name":"ci-test","description":"CI test channel"}')
           CHANNEL_ID=$(echo $RESPONSE | jq -r '.id // empty')
           [ -z "$CHANNEL_ID" ] && { echo "❌ Create channel failed: $RESPONSE"; exit 1; }
           echo "✅ Create channel OK"
@@ -58,20 +58,20 @@ jobs:
           curl -sf -X POST $BASE/channels/$CHANNEL_ID/messages \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"content":"hello from macOS CI"}' || { echo "❌ Send message failed"; exit 1; }
+            -d '{"content":"hello from CI"}' || { echo "❌ Send message failed"; exit 1; }
           echo "✅ Send message OK"
 
           echo "5. Bootstrap API..."
           RESPONSE=$(curl -sf -X POST $BASE/bootstrap \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"agent_name":"ci-mac-agent","display_name":"CI Mac Agent"}')
+            -d '{"agent_name":"ci-agent","display_name":"CI Agent"}')
           INVITE=$(echo $RESPONSE | jq -r '.invite_url // empty')
           [ -z "$INVITE" ] && { echo "❌ Bootstrap failed: $RESPONSE"; exit 1; }
           echo "✅ Bootstrap OK — invite_url present"
 
           echo ""
-          echo "All macOS smoke tests passed ✅"
+          echo "All smoke tests passed ✅"
 
       - name: Cleanup
         if: always()
