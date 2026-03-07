@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react"
-import { Search, ChevronDown, Hash, Plus, X } from "lucide-react"
+import { Search, ChevronDown, Hash, Plus, Settings, X } from "lucide-react"
 import { cn } from "../../lib/utils"
 import { OnlineIndicator } from "../ui/OnlineIndicator"
 import { TypeBadge } from "../ui/TypeBadge"
@@ -27,6 +27,7 @@ interface ChatSidebarProps {
   onSearch?: (query: string) => void
   onChannelUpdate?: (channel: Channel) => void
   onChannelDelete?: (channelId: string) => void
+  onOpenSettings?: () => void
 }
 
 function getDisplayName(name: string): string {
@@ -52,6 +53,7 @@ export function ChatSidebar({
   onSearch,
   onChannelUpdate,
   onChannelDelete,
+  onOpenSettings,
 }: ChatSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -234,6 +236,16 @@ export function ChatSidebar({
             )
           })}
         </nav>
+      </div>
+
+      <div className="border-t border-sidebar-border px-3 py-2">
+        <button
+          onClick={onOpenSettings}
+          className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+        >
+          <Settings className="h-4 w-4" />
+          <span>Profile settings</span>
+        </button>
       </div>
     </aside>
   )

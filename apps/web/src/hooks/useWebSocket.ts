@@ -5,6 +5,7 @@ import { fetchMessages } from '../services/api';
 
 interface UseWebSocketReturn {
   isConnected: boolean;
+  connectionStatus: 'connected' | 'reconnecting' | 'disconnected';
   messages: Message[];
   sendMessage: (text: string) => void;
   error: string | null;
@@ -12,8 +13,12 @@ interface UseWebSocketReturn {
 
 export function useWebSocket(_url: string, channelId: string): UseWebSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'reconnecting' | 'disconnected'>(
+    () => (localStorage.getItem('auth-token') ? 'reconnecting' : 'disconnected')
+  );
   const [messages, setMessages] = useState<Message[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => (localStorage.getItem('auth-token') ? null : 'Not authenticated'));
+
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -50,7 +55,6 @@ export function useWebSocket(_url: string, channelId: string): UseWebSocketRetur
     
     const token = localStorage.getItem('auth-token');
     if (!token) {
-      setError('Not authenticated');
       return;
     }
 
@@ -60,11 +64,13 @@ export function useWebSocket(_url: string, channelId: string): UseWebSocketRetur
     const wsUrl = `${wsProtocol}://${wsHost}/ws?token=${token}`;
 
     function connect() {
+      setConnectionStatus('reconnecting');
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setIsConnected(true);
+        setConnectionStatus('connected');
         setError(null);
         reconnectAttemptsRef.current = 0;
         console.log('WebSocket connected');
@@ -116,19 +122,22 @@ export function useWebSocket(_url: string, channelId: string): UseWebSocketRetur
       ws.onerror = () => {
         setError('WebSocket error');
         setIsConnected(false);
+        setConnectionStatus('disconnected');
       };
 
       ws.onclose = () => {
         setIsConnected(false);
-        
+
         // Reconnect with exponential backoff
         const attempts = reconnectAttemptsRef.current;
         if (attempts < 10) {
           const delay = Math.min(30000, 1000 * Math.pow(2, attempts));
           reconnectAttemptsRef.current++;
+          setConnectionStatus('reconnecting');
           console.log(`Reconnecting in ${delay}ms (attempt ${attempts + 1})`);
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         } else {
+          setConnectionStatus('disconnected');
           setError('Connection lost. Please refresh.');
         }
       };
@@ -159,6 +168,7 @@ export function useWebSocket(_url: string, channelId: string): UseWebSocketRetur
 
   return {
     isConnected,
+    connectionStatus,
     messages,
     sendMessage,
     error

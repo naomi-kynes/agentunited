@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChatSidebar } from '../components/chat/ChatSidebar';
 import { ChatHeader } from '../components/chat/ChatHeader';
 import { MessageList } from '../components/chat/MessageList';
@@ -8,6 +9,7 @@ import { NewDMModal } from '../components/chat/NewDMModal';
 import { MemberListPanel } from '../components/chat/MemberListPanel';
 import { SearchResultsPanel } from '../components/chat/SearchResultsPanel';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { ConnectionBanner } from '../components/ui/ConnectionBanner';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { chatApi } from '../services/chatApi';
 import { sendMessageWithAttachment } from '../services/api';
@@ -28,6 +30,7 @@ function getDisplayName(name: string): string {
 }
 
 export function ChatPage() {
+  const navigate = useNavigate();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
   const [selectedChannelId, setSelectedChannelId] = useState<string>('');
@@ -46,7 +49,7 @@ export function ChatPage() {
   const isViewingDM = !!selectedDMId;
   const activeConversationId = isViewingDM ? selectedDMId : selectedChannelId;
   
-  const { isConnected, messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', activeConversationId);
+  const { connectionStatus, messages, sendMessage, error: wsError } = useWebSocket('ws://localhost:8080/ws', activeConversationId);
 
   // Load channels on component mount
   useEffect(() => {
@@ -138,6 +141,20 @@ export function ChatPage() {
   const selectedChannel = channels.find(ch => ch.id === selectedChannelId) || null;
   const selectedDM = directMessages.find(dm => dm.id === selectedDMId) || null;
 
+  const markConversationRead = useCallback(async (kind: 'channel' | 'dm', id: string) => {
+    try {
+      if (kind === 'channel') {
+        await chatApi.markChannelRead(id);
+        setChannels((prev) => prev.map((ch) => (ch.id === id ? { ...ch, unread: 0 } : ch)));
+      } else {
+        await chatApi.markDMRead(id);
+        setDirectMessages((prev) => prev.map((dm) => (dm.id === id ? { ...dm, unread: 0 } : dm)));
+      }
+    } catch (error) {
+      console.error(`Failed to mark ${kind} as read:`, error);
+    }
+  }, []);
+
   const handleSendMessage = async (text: string, mentions?: { userId: string; display: string }[], attachment?: File) => {
     if (!activeConversationId) return;
     
@@ -164,12 +181,14 @@ export function ChatPage() {
     setSelectedChannelId(channelId);
     setSelectedDMId(''); // Clear DM selection
     setSidebarOpen(false);
+    void markConversationRead('channel', channelId);
   };
 
   const handleDMSelect = (dmId: string) => {
     setSelectedDMId(dmId);
     setSelectedChannelId(''); // Clear channel selection
     setSidebarOpen(false);
+    void markConversationRead('dm', dmId);
   };
 
   const handleCreateChannel = useCallback(async (name: string, description: string) => {
@@ -243,6 +262,27 @@ export function ChatPage() {
   const handleToggleMembers = useCallback(() => {
     setShowMembersPanel(prev => !prev);
   }, []);
+
+  useEffect(() => {
+    if (selectedDMId) {
+      void markConversationRead('dm', selectedDMId);
+    } else if (selectedChannelId) {
+      void markConversationRead('channel', selectedChannelId);
+    }
+  }, [selectedChannelId, selectedDMId, markConversationRead]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (selectedDMId) {
+        void markConversationRead('dm', selectedDMId);
+      } else if (selectedChannelId) {
+        void markConversationRead('channel', selectedChannelId);
+      }
+    };
+
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [selectedChannelId, selectedDMId, markConversationRead]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -347,14 +387,8 @@ export function ChatPage() {
           </div>
           <h2 className="text-lg font-semibold text-foreground">No channels yet</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Waiting for an agent to connect. Run <span className="font-mono text-foreground">./setup.sh</span> to get started.
+            Your agent will invite you to channels. Nothing here yet.
           </p>
-          <button
-            onClick={() => setShowCreateChannel(true)}
-            className="mt-5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600"
-          >
-            Create a channel
-          </button>
         </div>
 
         <CreateChannelModal
@@ -402,6 +436,10 @@ export function ChatPage() {
           onSearch={handleSearch}
           onChannelUpdate={handleChannelUpdate}
           onChannelDelete={handleChannelDelete}
+          onOpenSettings={() => {
+            setSidebarOpen(false);
+            navigate('/settings/profile');
+          }}
         />
       </ErrorBoundary>
 
@@ -423,6 +461,8 @@ export function ChatPage() {
         className="flex-1"
       >
         <div className="flex-1 flex flex-col">
+          <ConnectionBanner status={connectionStatus} error={wsError} />
+
           {isSearching ? (
             // Show search results instead of normal chat
             <SearchResultsPanel
@@ -434,15 +474,6 @@ export function ChatPage() {
           ) : (
             // Show normal chat interface
             <>
-              {!isConnected && (
-                <div className={`sticky top-0 z-20 border-b px-4 py-2 text-sm ${wsError ? 'border-destructive/25 bg-destructive/10 text-destructive' : 'border-amber-400/25 bg-amber-500/10 text-amber-700 dark:text-amber-300'}`}>
-                  <div className="flex items-center gap-2 font-medium">
-                    <span className={`inline-block h-2 w-2 rounded-full ${wsError ? 'bg-destructive' : 'bg-amber-500 animate-pulse'}`} />
-                    {wsError ? wsError : 'Reconnecting to live updates…'}
-                  </div>
-                </div>
-              )}
-
               <ChatHeader
                 channelName={activeConversationName}
                 topic={activeConversationTopic}

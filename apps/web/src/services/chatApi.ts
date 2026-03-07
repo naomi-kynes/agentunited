@@ -19,6 +19,7 @@ interface ApiChannel {
   topic?: string;
   description?: string;
   member_count?: number;
+  unread_count?: number;
 }
 
 interface SendMessageRequest {
@@ -90,7 +91,8 @@ function mapApiChannel(apiChannel: ApiChannel): Channel {
     id: apiChannel.id,
     name: apiChannel.name,
     topic: apiChannel.topic || apiChannel.description || '',
-    memberCount: apiChannel.member_count
+    memberCount: apiChannel.member_count,
+    unread: apiChannel.unread_count ?? 0,
   };
 }
 
@@ -262,6 +264,14 @@ export const chatApi = {
     const body = lastReadMessageId ? { last_read_message_id: lastReadMessageId } : {};
     await apiRequest<void>(
       `/api/v1/channels/${channelId}/read`,
+      { method: 'POST', body: JSON.stringify(body) }
+    );
+  },
+
+  async markDMRead(dmId: string, lastReadMessageId?: string): Promise<void> {
+    const body = lastReadMessageId ? { last_read_message_id: lastReadMessageId } : {};
+    await apiRequest<void>(
+      `/api/v1/dm/${dmId}/read`,
       { method: 'POST', body: JSON.stringify(body) }
     );
   },

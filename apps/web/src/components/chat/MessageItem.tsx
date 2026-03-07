@@ -111,12 +111,17 @@ export function MessageItem({
     }
 
     const now = new Date()
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    const diffMs = now.getTime() - date.getTime()
+    const diffMinutes = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
-    if (diffDays === 0) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-    if (diffDays === 1) return `Yesterday ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    if (diffMinutes < 1) return 'just now'
+    if (diffMinutes < 60) return `${diffMinutes} min ago`
+    if (diffHours < 24) return `${diffHours} hr ago`
+    if (diffDays === 1) return 'Yesterday'
 
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
   const formatEditedTimestamp = (value: string) => {
@@ -161,7 +166,10 @@ export function MessageItem({
       <>
         <div className="group flex gap-3 px-5 py-1 transition-colors hover:bg-slate-50 dark:hover:bg-white/5">
           <div className="w-8 shrink-0 text-right">
-            <span className="text-[10px] text-muted-foreground/0 transition-colors group-hover:text-muted-foreground/50">
+            <span
+              className="text-[10px] text-muted-foreground/0 transition-colors group-hover:text-muted-foreground/50"
+              title={new Date(timestamp).toLocaleString()}
+            >
               {formatTimestamp(timestamp, true)}
             </span>
           </div>
@@ -197,7 +205,9 @@ export function MessageItem({
           <div className="flex items-baseline gap-2">
             <span className="text-[13px] font-semibold text-foreground">{author.name}</span>
             <MemberBadge type={author.type} />
-            <span className="text-[11px] text-muted-foreground/60">{formatTimestamp(timestamp)}</span>
+            <span className="text-[11px] text-muted-foreground/60" title={new Date(timestamp).toLocaleString()}>
+              {formatTimestamp(timestamp)}
+            </span>
             {editedAt && (
               <span className="text-[11px] text-muted-foreground/40 italic" title={`Edited at ${formatEditedTimestamp(editedAt)}`}>
                 edited
