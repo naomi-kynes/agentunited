@@ -12,6 +12,7 @@ import (
 	"github.com/agentunited/backend/internal/realtime"
 	"github.com/agentunited/backend/internal/repository"
 	"github.com/agentunited/backend/internal/service"
+	"github.com/agentunited/backend/pkg/billing"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -66,6 +67,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	apiKeyRepo := repository.NewAPIKeyRepository(db)
 	webhookRepo := repository.NewWebhookRepository(db)
 	integrationRepo := repository.NewIntegrationRepository(db)
+	subscriptionRepo := repository.NewSubscriptionRepository(db)
 	inviteRepo := repository.NewInviteRepository(db)
 
 	// Initialize services
@@ -77,6 +79,8 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	apiKeyService := service.NewAPIKeyService(apiKeyRepo, agentRepo)
 	webhookService := service.NewWebhookService(webhookRepo, agentRepo)
 	integrationService := service.NewIntegrationService(integrationRepo, webhookService)
+	billingProvider := billing.NewStub(cfg.Stripe.SecretKey != "" && cfg.Stripe.PriceIDPro != "")
+	billingService := service.NewBillingService(subscriptionRepo, billingProvider, cfg.Stripe.WebhookSecret, cfg.Stripe.PriceIDPro)
 	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, cfg.JWT.Secret, "http://localhost:8080")
 	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret)
 
@@ -89,6 +93,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	channelHandler := handlers.NewChannelHandler(channelService)
 	messageHandler := handlers.NewMessageHandler(messageService, webhookService, hub, realtimeEngine, integrationService)
 	integrationHandler := handlers.NewIntegrationHandler(integrationService)
+	billingHandler := handlers.NewBillingHandler(billingService)
 	agentHandler := handlers.NewAgentHandler(agentService)
 	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyService)
 	webhookHandler := handlers.NewWebhookHandler(webhookService)
@@ -116,6 +121,9 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Post("/login", authHandler.Login)
 	})
 
+	// Public billing webhook route
+	r.Post("/api/v1/billing/webhook", billingHandler.Webhook)
+
 	// Protected API v1 routes (require JWT or API key authentication)
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(mw.Auth(cfg.JWT.Secret, apiKeyRepo, agentRepo))
@@ -129,6 +137,10 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/integrations", integrationHandler.List)
 		r.Post("/integrations", integrationHandler.Create)
 		r.Delete("/integrations/{id}", integrationHandler.Delete)
+
+		// Billing routes
+		r.Get("/billing/checkout", billingHandler.Checkout)
+		r.Get("/billing/portal", billingHandler.Portal)
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
@@ -214,6 +226,10 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/integrations", integrationHandler.List)
 		r.Post("/integrations", integrationHandler.Create)
 		r.Delete("/integrations/{id}", integrationHandler.Delete)
+
+		// Billing routes
+		r.Get("/billing/checkout", billingHandler.Checkout)
+		r.Get("/billing/portal", billingHandler.Portal)
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {

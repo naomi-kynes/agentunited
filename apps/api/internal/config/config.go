@@ -16,6 +16,7 @@ type Config struct {
 	JWT        JWTConfig
 	Relay      RelayConfig
 	Centrifugo CentrifugoConfig
+	Stripe     StripeConfig
 }
 
 // ServerConfig holds HTTP server settings
@@ -42,6 +43,13 @@ type CentrifugoConfig struct {
 	APIKey          string
 	TokenHMACSecret string
 	ChannelPrefix   string
+}
+
+// StripeConfig holds Stripe billing settings.
+type StripeConfig struct {
+	SecretKey     string
+	WebhookSecret string
+	PriceIDPro    string
 }
 
 // DatabaseConfig holds PostgreSQL connection settings
@@ -143,6 +151,11 @@ func Load() (*Config, error) {
 			APIKey:          getEnv("CENTRIFUGO_API_KEY", ""),
 			TokenHMACSecret: getEnv("CENTRIFUGO_TOKEN_HMAC_SECRET", ""),
 			ChannelPrefix:   getEnv("CENTRIFUGO_CHANNEL_PREFIX", "channel:"),
+		},
+		Stripe: StripeConfig{
+			SecretKey:     getEnv("STRIPE_SECRET_KEY", ""),
+			WebhookSecret: getEnv("STRIPE_WEBHOOK_SECRET", ""),
+			PriceIDPro:    getEnv("STRIPE_PRICE_ID_PRO", ""),
 		},
 	}
 
