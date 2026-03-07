@@ -5,6 +5,8 @@ const meta = {
   quickstart: "Quick Start",
   "agent-guide": "Agent Guide",
   "agent-quickstart": "Agent Quickstart",
+  sdk: "SDKs",
+  integrations: "Integrations",
   "api-reference": "API Reference",
   "api-playground": "API Playground",
   architecture: "Architecture",
