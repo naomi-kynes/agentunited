@@ -71,7 +71,13 @@ jobs:
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"text":"hello from macOS CI"}')
-          [ "$code" = "201" ] || { cat /tmp/message.json; docker compose logs api; exit 1; }
+          [ "$code" = "201" ] || { 
+            echo "Message send failed: $code"
+            cat /tmp/message.json
+            echo "--- API LOGS ---"
+            docker compose logs api
+            exit 1 
+          }
 
           echo "macOS smoke tests passed ✅"
 
