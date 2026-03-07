@@ -26,6 +26,7 @@ type ChannelService interface {
 	ListDMChannels(ctx context.Context, userID string) ([]*models.ChannelWithMembers, error)
 	CreateOrGetDMChannel(ctx context.Context, userID, targetUserID string) (*models.Channel, error)
 	IsMember(ctx context.Context, channelID, userID string) (bool, string, error)
+	MarkChannelRead(ctx context.Context, channelID, userID string) error
 }
 
 // channelService implements ChannelService
@@ -257,7 +258,7 @@ func (s *channelService) RemoveMember(ctx context.Context, channelID, targetUser
 	// - Admins can remove members but not other admins or owners
 	// - Members can only remove themselves
 	canRemove := false
-	
+
 	if requesterUserID == targetUserID {
 		// Users can always remove themselves
 		canRemove = true
@@ -305,6 +306,21 @@ func (s *channelService) CreateOrGetDMChannel(ctx context.Context, userID, targe
 	}
 
 	return channel, nil
+}
+
+// MarkChannelRead marks a channel as read for a user.
+func (s *channelService) MarkChannelRead(ctx context.Context, channelID, userID string) error {
+	isMember, _, err := s.channelRepo.IsMember(ctx, channelID, userID)
+	if err != nil {
+		return fmt.Errorf("check membership: %w", err)
+	}
+	if !isMember {
+		return models.ErrNotChannelMember
+	}
+	if err := s.channelRepo.MarkChannelRead(ctx, userID, channelID); err != nil {
+		return fmt.Errorf("mark channel read: %w", err)
+	}
+	return nil
 }
 
 // isValidChannelName checks if a channel name is valid

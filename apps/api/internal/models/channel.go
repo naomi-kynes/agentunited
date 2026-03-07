@@ -25,8 +25,9 @@ type ChannelMember struct {
 // ChannelWithMembers includes member information
 type ChannelWithMembers struct {
 	Channel
-	Members      []*MemberInfo `json:"members,omitempty"`
-	MemberCount  int           `json:"member_count,omitempty"`
+	Members     []*MemberInfo `json:"members,omitempty"`
+	MemberCount int           `json:"member_count,omitempty"`
+	UnreadCount int           `json:"unread_count"`
 }
 
 // MemberInfo represents minimal user info for channel members

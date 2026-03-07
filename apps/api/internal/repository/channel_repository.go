@@ -24,6 +24,8 @@ type ChannelRepository interface {
 	RemoveMember(ctx context.Context, channelID, userID string) error
 	ListDMChannels(ctx context.Context, userID string) ([]*models.ChannelWithMembers, error)
 	GetOrCreateDMChannel(ctx context.Context, user1ID, user2ID string) (*models.Channel, error)
+	MarkChannelRead(ctx context.Context, userID, channelID string) error
+	GetUnreadCounts(ctx context.Context, userID string) (map[string]int, error)
 }
 
 // PostgresChannelRepository implements ChannelRepository with PostgreSQL
@@ -152,7 +154,15 @@ func (r *PostgresChannelRepository) ListByUser(ctx context.Context, userID strin
 			c.created_by, 
 			c.created_at, 
 			c.updated_at,
-			COUNT(cm2.id) as member_count
+			COUNT(cm2.id) as member_count,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM messages m
+				LEFT JOIN user_channel_reads ucr ON ucr.user_id = $1 AND ucr.channel_id = m.channel_id
+				WHERE m.channel_id = c.id
+				  AND m.author_id <> $1
+				  AND m.created_at > COALESCE(ucr.last_read_at, to_timestamp(0))
+			), 0) as unread_count
 		FROM channels c
 		INNER JOIN channel_members cm ON c.id = cm.channel_id
 		LEFT JOIN channel_members cm2 ON c.id = cm2.channel_id
@@ -179,6 +189,7 @@ func (r *PostgresChannelRepository) ListByUser(ctx context.Context, userID strin
 			&ch.CreatedAt,
 			&ch.UpdatedAt,
 			&ch.MemberCount,
+			&ch.UnreadCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan channel: %w", err)
@@ -365,7 +376,15 @@ func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID s
 			c.created_at, 
 			c.updated_at,
 			COUNT(cm2.id) as member_count,
-			COALESCE(other_user.email, other_agent.display_name, '') as other_participant
+			COALESCE(other_user.email, other_agent.display_name, '') as other_participant,
+			COALESCE((
+				SELECT COUNT(*)
+				FROM messages m
+				LEFT JOIN user_channel_reads ucr ON ucr.user_id = $1 AND ucr.channel_id = m.channel_id
+				WHERE m.channel_id = c.id
+				  AND m.author_id <> $1
+				  AND m.created_at > COALESCE(ucr.last_read_at, to_timestamp(0))
+			), 0) as unread_count
 		FROM channels c
 		INNER JOIN channel_members cm ON c.id = cm.channel_id
 		LEFT JOIN channel_members cm2 ON c.id = cm2.channel_id
@@ -397,11 +416,11 @@ func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID s
 			&ch.UpdatedAt,
 			&ch.MemberCount,
 			&otherParticipant,
+			&ch.UnreadCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scan dm channel: %w", err)
 		}
-		// Override DM channel name with other participant's name
 		if otherParticipant != "" {
 			ch.Name = otherParticipant
 		}
@@ -417,30 +436,19 @@ func (r *PostgresChannelRepository) ListDMChannels(ctx context.Context, userID s
 
 // GetOrCreateDMChannel gets existing DM channel between two users or creates one
 func (r *PostgresChannelRepository) GetOrCreateDMChannel(ctx context.Context, user1ID, user2ID string) (*models.Channel, error) {
-	// Start transaction
 	tx, err := r.db.Pool.Begin(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
-	// Look for existing DM channel between these two users
 	findQuery := `
 		SELECT c.id, c.name, c.topic, c.type, c.created_by, c.created_at, c.updated_at
 		FROM channels c
 		WHERE c.type = 'dm'
-		AND EXISTS (
-			SELECT 1 FROM channel_members cm1 
-			WHERE cm1.channel_id = c.id AND cm1.user_id = $1
-		)
-		AND EXISTS (
-			SELECT 1 FROM channel_members cm2 
-			WHERE cm2.channel_id = c.id AND cm2.user_id = $2
-		)
-		AND (
-			SELECT COUNT(*) FROM channel_members cm 
-			WHERE cm.channel_id = c.id
-		) = 2
+		AND EXISTS (SELECT 1 FROM channel_members cm1 WHERE cm1.channel_id = c.id AND cm1.user_id = $1)
+		AND EXISTS (SELECT 1 FROM channel_members cm2 WHERE cm2.channel_id = c.id AND cm2.user_id = $2)
+		AND (SELECT COUNT(*) FROM channel_members cm WHERE cm.channel_id = c.id) = 2
 		LIMIT 1
 	`
 
@@ -454,20 +462,16 @@ func (r *PostgresChannelRepository) GetOrCreateDMChannel(ctx context.Context, us
 		&channel.CreatedAt,
 		&channel.UpdatedAt,
 	)
-
 	if err == nil {
-		// Found existing DM channel
 		if err := tx.Commit(ctx); err != nil {
 			return nil, fmt.Errorf("commit transaction: %w", err)
 		}
 		return &channel, nil
 	}
-
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, fmt.Errorf("find existing dm channel: %w", err)
 	}
 
-	// Create new DM channel
 	now := time.Now()
 	channel = models.Channel{
 		Name:      fmt.Sprintf("dm-%s-%s", user1ID[:8], user2ID[:8]),
@@ -483,40 +487,72 @@ func (r *PostgresChannelRepository) GetOrCreateDMChannel(ctx context.Context, us
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id, created_at, updated_at
 	`
-
-	err = tx.QueryRow(ctx, insertQuery,
-		channel.Name,
-		channel.Topic,
-		channel.Type,
-		channel.CreatedBy,
-		channel.CreatedAt,
-		channel.UpdatedAt,
-	).Scan(&channel.ID, &channel.CreatedAt, &channel.UpdatedAt)
-
+	err = tx.QueryRow(ctx, insertQuery, channel.Name, channel.Topic, channel.Type, channel.CreatedBy, channel.CreatedAt, channel.UpdatedAt).
+		Scan(&channel.ID, &channel.CreatedAt, &channel.UpdatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("create dm channel: %w", err)
 	}
 
-	// Add both users as members
-	memberQuery := `
-		INSERT INTO channel_members (channel_id, user_id, role, joined_at)
-		VALUES ($1, $2, $3, NOW())
-	`
-
-	_, err = tx.Exec(ctx, memberQuery, channel.ID, user1ID, "member")
-	if err != nil {
+	memberQuery := `INSERT INTO channel_members (channel_id, user_id, role, joined_at) VALUES ($1, $2, $3, NOW())`
+	if _, err := tx.Exec(ctx, memberQuery, channel.ID, user1ID, "member"); err != nil {
 		return nil, fmt.Errorf("add first member to dm channel: %w", err)
 	}
-
-	_, err = tx.Exec(ctx, memberQuery, channel.ID, user2ID, "member")
-	if err != nil {
+	if _, err := tx.Exec(ctx, memberQuery, channel.ID, user2ID, "member"); err != nil {
 		return nil, fmt.Errorf("add second member to dm channel: %w", err)
 	}
 
-	// Commit transaction
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit transaction: %w", err)
 	}
-
 	return &channel, nil
+}
+
+// MarkChannelRead upserts the last_read_at timestamp for a user/channel pair.
+func (r *PostgresChannelRepository) MarkChannelRead(ctx context.Context, userID, channelID string) error {
+	query := `
+		INSERT INTO user_channel_reads (user_id, channel_id, last_read_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (user_id, channel_id)
+		DO UPDATE SET last_read_at = EXCLUDED.last_read_at
+	`
+	if _, err := r.db.Pool.Exec(ctx, query, userID, channelID); err != nil {
+		return fmt.Errorf("mark channel read: %w", err)
+	}
+	return nil
+}
+
+// GetUnreadCounts returns per-channel unread counts for the given user.
+func (r *PostgresChannelRepository) GetUnreadCounts(ctx context.Context, userID string) (map[string]int, error) {
+	query := `
+		SELECT
+			m.channel_id,
+			COUNT(*)::int AS unread_count
+		FROM messages m
+		INNER JOIN channel_members cm ON cm.channel_id = m.channel_id AND cm.user_id = $1
+		LEFT JOIN user_channel_reads ucr ON ucr.user_id = $1 AND ucr.channel_id = m.channel_id
+		WHERE m.author_id <> $1
+		  AND m.created_at > COALESCE(ucr.last_read_at, to_timestamp(0))
+		GROUP BY m.channel_id
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get unread counts: %w", err)
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+	for rows.Next() {
+		var channelID string
+		var count int
+		if err := rows.Scan(&channelID, &count); err != nil {
+			return nil, fmt.Errorf("scan unread count: %w", err)
+		}
+		counts[channelID] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate unread counts: %w", err)
+	}
+
+	return counts, nil
 }

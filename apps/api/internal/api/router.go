@@ -169,6 +169,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 				r.Get("/", channelHandler.Get)
 				r.Patch("/", channelHandler.Update)
 				r.Delete("/", channelHandler.Delete)
+				r.Post("/read", channelHandler.MarkRead)
 
 				// Channel member routes
 				r.Get("/members", channelHandler.GetMembers)
@@ -189,6 +190,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		// DM routes
 		r.Post("/dm", channelHandler.CreateDM)
 		r.Get("/dm", channelHandler.ListDMs)
+		r.Post("/dm/{id}/read", channelHandler.MarkDMRead)
 	})
 
 	// Backward compatibility: Mount protected routes on /v1 as well
@@ -247,6 +249,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 				r.Get("/", channelHandler.Get)
 				r.Patch("/", channelHandler.Update)
 				r.Delete("/", channelHandler.Delete)
+				r.Post("/read", channelHandler.MarkRead)
 
 				// Channel member routes
 				r.Get("/members", channelHandler.GetMembers)
@@ -267,6 +270,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		// DM routes
 		r.Post("/dm", channelHandler.CreateDM)
 		r.Get("/dm", channelHandler.ListDMs)
+		r.Post("/dm/{id}/read", channelHandler.MarkDMRead)
 	})
 
 	return r

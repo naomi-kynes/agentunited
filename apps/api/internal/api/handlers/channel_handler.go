@@ -163,7 +163,7 @@ func (h *ChannelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		h.handleChannelError(w, err, "get channel for update")
 		return
 	}
-	
+
 	name := current.Name
 	topic := current.Topic
 	if req.Name != nil {
@@ -406,6 +406,46 @@ func (h *ChannelHandler) ListDMs(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"channels": channels,
 	})
+}
+
+// MarkRead handles POST /api/v1/channels/{id}/read
+func (h *ChannelHandler) MarkRead(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+	channelID := chi.URLParam(r, "id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+	if err := h.channelService.MarkChannelRead(ctx, channelID, userID); err != nil {
+		h.handleChannelError(w, err, "mark channel read")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// MarkDMRead handles POST /api/v1/dm/{id}/read
+func (h *ChannelHandler) MarkDMRead(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	userID, ok := middleware.GetUserID(ctx)
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, ErrorResponse{Error: "Unauthorized"})
+		return
+	}
+	channelID := chi.URLParam(r, "id")
+	if channelID == "" {
+		respondJSON(w, http.StatusBadRequest, ErrorResponse{Error: "Channel ID is required"})
+		return
+	}
+	if err := h.channelService.MarkChannelRead(ctx, channelID, userID); err != nil {
+		h.handleChannelError(w, err, "mark dm read")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleChannelError maps service errors to HTTP status codes
