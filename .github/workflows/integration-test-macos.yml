@@ -13,7 +13,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Pre-clean docker state
-        run: docker compose down -v --remove-orphans || true
+        run: |
+          docker compose down -v || true
+          docker rm -f agentunited-web agentunited-api agentunited-postgres agentunited-redis agentunited-centrifugo || true
 
       - name: Run setup.sh
         run: chmod +x ./setup.sh && ./setup.sh
@@ -37,24 +39,6 @@ jobs:
           BASE=http://localhost:8080/api/v1
 
           curl -sf http://localhost:8080/health >/dev/null
-
-          REGISTER=$(curl -sf -X POST $BASE/auth/register \
-            -H "Content-Type: application/json" \
-            -d '{"email":"ci-mac@test.com","password":"testpass123"}')
-          TOKEN=$(echo "$REGISTER" | jq -r '.token // empty')
-          [ -z "$TOKEN" ] && { echo "register failed: $REGISTER"; exit 1; }
-
-          CHANNEL_RESP=$(curl -sf -X POST $BASE/channels \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"name":"ci-mac-test","topic":"CI macOS channel"}')
-          CHANNEL_ID=$(echo "$CHANNEL_RESP" | jq -r '.channel.id // .id // empty')
-          [ -z "$CHANNEL_ID" ] && { echo "channel create failed: $CHANNEL_RESP"; exit 1; }
-
-          curl -sf -X POST $BASE/channels/$CHANNEL_ID/messages \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"text":"hello from macOS CI"}' >/dev/null
 
           BOOTSTRAP=$(curl -sf -X POST $BASE/bootstrap \
             -H "Content-Type: application/json" \
@@ -82,8 +66,28 @@ jobs:
           INVITE=$(echo "$BOOTSTRAP" | jq -r '.invite_url // .humans[0].invite_url // empty')
           [ -z "$INVITE" ] && { echo "bootstrap parse failed: $BOOTSTRAP"; exit 1; }
 
+          REGISTER=$(curl -sf -X POST $BASE/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"ci-mac@test.com","password":"testpass123"}')
+          TOKEN=$(echo "$REGISTER" | jq -r '.token // empty')
+          [ -z "$TOKEN" ] && { echo "register failed: $REGISTER"; exit 1; }
+
+          CHANNEL_RESP=$(curl -sf -X POST $BASE/channels \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"ci-mac-test","topic":"CI macOS channel"}')
+          CHANNEL_ID=$(echo "$CHANNEL_RESP" | jq -r '.channel.id // .id // empty')
+          [ -z "$CHANNEL_ID" ] && { echo "channel create failed: $CHANNEL_RESP"; exit 1; }
+
+          curl -sf -X POST $BASE/channels/$CHANNEL_ID/messages \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"text":"hello from macOS CI"}' >/dev/null
+
           echo "macOS smoke tests passed ✅"
 
       - name: Cleanup
         if: always()
-        run: docker compose down -v --remove-orphans
+        run: |
+          docker compose down -v || true
+          docker rm -f agentunited-web agentunited-api agentunited-postgres agentunited-redis agentunited-centrifugo || true
