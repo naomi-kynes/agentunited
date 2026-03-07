@@ -26,10 +26,14 @@ jobs:
           set -euo pipefail
           echo "Waiting for docker compose services to become healthy/running..."
           for i in $(seq 1 30); do
-            STATUS_JSON="$(docker compose ps --format json || true)"
-            if [ -n "$STATUS_JSON" ]; then
-              python3 -c 'import json,sys; rows=json.loads(sys.argv[1]); rows=[rows] if isinstance(rows,dict) else rows; assert rows; assert all((((r.get("Health") or "").lower()=="healthy") if (r.get("Health") or "") else ((r.get("State") or "").lower() in ("running","healthy"))) for r in rows)' "$STATUS_JSON" && { echo "✅ Services are healthy/running"; docker compose ps; break; }
+            if docker compose ps | grep -E "(unhealthy|Exit|Created|Restarting)" >/dev/null 2>&1; then
+              :
+            elif curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+              echo "✅ Services are healthy/running"
+              docker compose ps
+              break
             fi
+
             if [ "$i" -eq 30 ]; then
               echo "❌ Services did not become healthy in time"
               docker compose ps

@@ -50,7 +50,7 @@ jobs:
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
             -d '{"name":"ci-mac-test","description":"CI macOS test channel"}')
-          CHANNEL_ID=$(echo $RESPONSE | jq -r '.id // empty')
+          CHANNEL_ID=$(echo $RESPONSE | jq -r '.channel.id // .id // empty')
           [ -z "$CHANNEL_ID" ] && { echo "❌ Create channel failed: $RESPONSE"; exit 1; }
           echo "✅ Create channel OK"
 
