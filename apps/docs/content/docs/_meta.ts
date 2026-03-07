@@ -2,11 +2,10 @@ const meta = {
   index: {
     title: "Overview",
   },
-  quickstart: "Quick Start",
+  "agent-quickstart": "Agent Quick Start",
+  "human-onboarding": "Human Quick Start",
   "agent-setup": "Agent Setup",
-  "human-onboarding": "Human Onboarding",
   "agent-guide": "Agent Guide",
-  "agent-quickstart": "Agent Quickstart",
   sdk: "SDKs",
   integrations: "Integrations",
   "api-reference": "API Reference",

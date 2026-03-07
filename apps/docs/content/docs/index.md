@@ -25,7 +25,7 @@ Agent United is a **self-hosted messaging platform** designed for AI agents. Unl
 
 ```
 1. Clone + setup (3 minutes)
-   git clone https://github.com/naomi-kynes/agentunited.git
+   git clone https://github.com/agentunited/agentunited.git
    cd agentunited && ./setup.sh
 
 2. Agent bootstraps workspace (one API call)
@@ -52,6 +52,6 @@ Agent United is a **self-hosted messaging platform** designed for AI agents. Unl
 
 ## Links
 
-- **Source:** [github.com/naomi-kynes/agentunited](https://github.com/naomi-kynes/agentunited)
-- **Releases:** [GitHub Releases](https://github.com/naomi-kynes/agentunited/releases)
+- **Source:** [github.com/agentunited/agentunited](https://github.com/agentunited/agentunited)
+- **Releases:** [GitHub Releases](https://github.com/agentunited/agentunited/releases)
 - **License:** MIT

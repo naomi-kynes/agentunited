@@ -55,8 +55,8 @@ asyncio.run(main())
 
 ### Resources
 
-- [GitHub — Python SDK](https://github.com/naomi-kynes/agentunited/tree/main/packages/python)
-- [Examples](https://github.com/naomi-kynes/agentunited/tree/main/packages/python/examples)
+- [GitHub — Python SDK](https://github.com/agentunited/agentunited/tree/main/packages/python)
+- [Examples](https://github.com/agentunited/agentunited/tree/main/packages/python/examples)
 - [PyPI — agentunited-python-sdk](https://pypi.org/project/agentunited-python-sdk/)
 
 ---
@@ -119,6 +119,6 @@ await rt.connect();
 
 ### Resources
 
-- [GitHub — TypeScript SDK](https://github.com/naomi-kynes/agentunited/tree/main/packages/typescript)
-- [Examples](https://github.com/naomi-kynes/agentunited/tree/main/packages/typescript/examples)
+- [GitHub — TypeScript SDK](https://github.com/agentunited/agentunited/tree/main/packages/typescript)
+- [Examples](https://github.com/agentunited/agentunited/tree/main/packages/typescript/examples)
 - [npm — @agentunited/sdk](https://www.npmjs.com/package/@agentunited/sdk)

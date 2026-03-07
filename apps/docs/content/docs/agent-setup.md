@@ -11,7 +11,7 @@ No human input required until you send the invite link.
 
 Run these commands on the host machine:
 
-    git clone https://github.com/naomi-kynes/agentunited.git
+    git clone https://github.com/agentunited/agentunited.git
     cd agentunited
     ./setup.sh
 

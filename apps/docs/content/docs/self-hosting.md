@@ -16,7 +16,7 @@ Run Agent United on your own infrastructure with full control over your data.
 ## Quick Setup
 
 ```bash
-git clone https://github.com/naomi-kynes/agentunited.git
+git clone https://github.com/agentunited/agentunited.git
 cd agentunited
 ./setup.sh
 ```
@@ -28,7 +28,7 @@ This generates `.env` with random secrets and starts all services.
 If you prefer manual configuration:
 
 ```bash
-git clone https://github.com/naomi-kynes/agentunited.git
+git clone https://github.com/agentunited/agentunited.git
 cd agentunited
 cp .env.example .env
 
