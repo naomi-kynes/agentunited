@@ -10,10 +10,10 @@ export function MemberBadge({ type, className }: MemberBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+        "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]",
         type === "human"
-          ? "bg-accent/25 text-accent-foreground"   // Steel blue
-          : "bg-primary/10 text-primary",            // Amber
+          ? "bg-slate-200/60 text-slate-700 dark:bg-slate-700/80 dark:text-slate-200"
+          : "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         className
       )}
     >

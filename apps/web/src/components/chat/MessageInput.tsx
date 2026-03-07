@@ -53,7 +53,7 @@ export function MessageInput({
 
   // Sync refs
   if (textareaRef.current && inputRef.current !== textareaRef.current) {
-    (inputRef as any).current = textareaRef.current;
+    inputRef.current = textareaRef.current;
   }
 
   const handleValueChange = useCallback((newValue: string) => {
@@ -190,7 +190,7 @@ export function MessageInput({
 
   return (
     <>
-      <div className={cn("border-t border-border bg-card px-5 py-3", className)}>
+      <div className={cn("border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm", className)}>
         {/* File attachment preview */}
         {selectedFile && (
           <div className="mb-3 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
@@ -216,7 +216,7 @@ export function MessageInput({
           </div>
         )}
 
-        <div className="flex items-end gap-2 rounded-xl border border-input bg-background px-3 py-2 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+        <div className="flex items-end gap-2 rounded-2xl border border-border/80 bg-white px-3 py-2 shadow-sm transition-all duration-150 focus-within:border-emerald-400/60 focus-within:shadow-[0_0_0_3px_rgba(16,185,129,0.08)] dark:bg-card">
           <button
             className="mb-0.5 shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             aria-label="Attach file"

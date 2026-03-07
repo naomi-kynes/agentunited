@@ -20,6 +20,12 @@ interface DirectMessage {
   unread?: number;
 }
 
+function getDisplayName(name: string): string {
+  if (!name.includes('@')) return name;
+  const localPart = name.split('@')[0] ?? name;
+  return localPart.replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function ChatPage() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
@@ -340,7 +346,7 @@ export function ChatPage() {
 
   // Determine the active conversation name and type
   const activeConversationName = isViewingDM 
-    ? selectedDM?.name || 'Unknown'
+    ? getDisplayName(selectedDM?.name || 'Unknown')
     : selectedChannel?.name || 'unknown';
   
   const activeConversationTopic = isViewingDM 
@@ -352,7 +358,7 @@ export function ChatPage() {
       <ChatSidebar
         channels={channels}
         directMessages={directMessages}
-        activeChannelId={selectedChannelId}
+        activeChannelId={activeConversationId}
         onChannelSelect={handleSelectChannel}
         onDMSelect={handleDMSelect}
         onCreateChannel={() => setShowCreateChannel(true)}

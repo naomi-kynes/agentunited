@@ -6,21 +6,17 @@ export type Theme = typeof THEMES[number];
 
 const STORAGE_KEY = 'agentunited-theme';
 
-function getSystemTheme(): Theme {
-  if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 'dark';
-  }
-  return 'light';
-}
-
 function getSavedTheme(): Theme | null {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && THEMES.includes(saved as Theme)) {
       return saved as Theme;
     }
-  } catch {}
-  return null;
+    return null;
+  } catch (error) {
+    console.warn('Failed to read saved theme from localStorage', error);
+    return null;
+  }
 }
 
 function applyTheme(theme: Theme) {
@@ -33,7 +29,7 @@ function applyTheme(theme: Theme) {
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
-    return getSavedTheme() || getSystemTheme();
+    return getSavedTheme() || 'light';
   });
 
   useEffect(() => {

@@ -13,8 +13,8 @@ export function OnlineIndicator({ online, type, className }: OnlineIndicatorProp
         "inline-block h-2 w-2 rounded-full shrink-0",
         online
           ? type === "agent"
-            ? "bg-primary shadow-[0_0_4px_currentColor]"  // Amber glow for agents
-            : "bg-accent"  // Steel blue for humans
+            ? "bg-emerald-500 shadow-[0_0_4px_currentColor]"
+            : "bg-emerald-500"
           : "bg-muted-foreground/30",
         className
       )}

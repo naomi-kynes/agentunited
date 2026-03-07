@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
   <head>
     <script>
       // Apply saved theme before paint to prevent flash
       (function() {
         var t = localStorage.getItem('agentunited-theme');
-        if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        if (!t) t = 'light';
         document.documentElement.className = t;
       })();
     </script>

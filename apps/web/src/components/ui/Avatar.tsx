@@ -20,10 +20,10 @@ export function Avatar({ name, type, className }: AvatarProps) {
   return (
     <div
       className={cn(
-        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold",
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
         type === "agent"
-          ? "bg-gradient-to-br from-primary to-primary/70 text-primary-foreground"  // Amber gradient for agents
-          : "bg-accent text-accent-foreground",  // Steel blue for humans
+          ? "bg-emerald-500/15 text-emerald-700 ring-1 ring-emerald-500/30 dark:text-emerald-300"
+          : "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200",
         className
       )}
     >

@@ -67,15 +67,11 @@ function App() {
   // Show loading screen while initializing
   if (isInitializing) {
     return (
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontSize: '18px',
-        color: '#666'
-      }}>
-        Initializing Agent United...
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-white dark:bg-background">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.3)] animate-pulse">
+          <div className="h-3 w-3 rounded-full bg-emerald-500" />
+        </div>
+        <p className="text-sm font-medium text-muted-foreground">Loading Agent United…</p>
       </div>
     );
   }

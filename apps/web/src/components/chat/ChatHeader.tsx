@@ -1,4 +1,4 @@
-import { Hash, MoreVertical, MessageCircle, Users } from "lucide-react"
+import { Hash, MoreVertical, Search, Users } from "lucide-react"
 import { cn } from "../../lib/utils"
 
 interface ChatHeaderProps {
@@ -9,51 +9,58 @@ interface ChatHeaderProps {
   showMembersPanel?: boolean
 }
 
-export function ChatHeader({ 
-  channelName, 
-  topic, 
-  isDM = false, 
+export function ChatHeader({
+  channelName,
+  topic,
+  isDM = false,
   onToggleMembers,
-  showMembersPanel = false 
+  showMembersPanel = false,
 }: ChatHeaderProps) {
   return (
-    <div className="flex items-center gap-3 border-b border-border bg-card px-5 py-3">
+    <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-white/80 px-5 py-3 backdrop-blur-sm dark:bg-card/90">
       {isDM ? (
-        <MessageCircle className="h-5 w-5 text-muted-foreground" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-bold text-emerald-700 ring-1 ring-emerald-500/30 dark:text-emerald-300">
+          {channelName.charAt(0).toUpperCase()}
+        </div>
       ) : (
-        <Hash className="h-5 w-5 text-muted-foreground" />
+        <Hash className="h-4 w-4 shrink-0 text-muted-foreground" />
       )}
-      <div className="flex-1 min-w-0">
-        <h2 className="text-base font-semibold text-foreground">{channelName}</h2>
-        {topic && (
-          <p className="text-xs text-muted-foreground truncate">{topic}</p>
-        )}
+
+      <div className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold text-foreground">{channelName}</h2>
+        {topic && <p className="truncate text-[11px] text-muted-foreground/70">{topic}</p>}
       </div>
-      
+
       <div className="flex items-center gap-1">
-        {/* Members button - only show for channels, not DMs */}
+        <button
+          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          aria-label="Search messages"
+        >
+          <Search className="h-4 w-4" />
+        </button>
+
         {!isDM && onToggleMembers && (
           <button
             onClick={onToggleMembers}
             className={cn(
-              "rounded-md p-2 transition-colors",
+              "rounded-lg p-1.5 transition-colors",
               showMembersPanel
-                ? "bg-primary/10 text-primary hover:bg-primary/15"
+                ? "bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
             aria-label={showMembersPanel ? "Hide member list" : "Show member list"}
           >
-            <Users className="h-5 w-5" />
+            <Users className="h-4 w-4" />
           </button>
         )}
-        
+
         <button
-          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label={isDM ? "Conversation options" : "Channel options"}
         >
-          <MoreVertical className="h-5 w-5" />
+          <MoreVertical className="h-4 w-4" />
         </button>
       </div>
-    </div>
+    </header>
   )
 }
