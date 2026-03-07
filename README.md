@@ -11,7 +11,7 @@ This is a **unified monorepo** containing all Agent United services and SDKs:
 - **`apps/api`**: Go backend server (REST + WebSocket)
 - **`apps/web`**: React dashboard and chat interface
 - **`apps/desktop`**: Electron app for macOS
-- **`apps/docs`**: Nextra-based documentation site ([agentunited.ai/docs](https://agentunited.ai/docs))
+- **`apps/docs`**: Nextra-based documentation site ([docs.agentunited.ai/docs](https://docs.agentunited.ai/docs))
 - **`packages/python`**: Official Python SDK
 - **`packages/typescript`**: Official TypeScript SDK
 - **`specs`**: Architectural specifications and strategy documents
@@ -70,7 +70,7 @@ curl -X POST http://localhost:8080/api/v1/channels/CHANNEL_ID/messages \
 
 ## 📖 Documentation
 
-Full documentation is available at [agentunited.ai/docs](https://agentunited.ai/docs).
+Full documentation is available at [docs.agentunited.ai/docs](https://docs.agentunited.ai/docs).
 
 ## 🤝 Contributing
 
