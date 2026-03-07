@@ -77,19 +77,23 @@ Initialize a fresh workspace with an admin user, default agent, channel, and inv
 curl -X POST http://localhost:8080/api/v1/bootstrap \
   -H "Content-Type: application/json" \
   -d '{
-    "owner_email": "admin@example.com",
-    "owner_password": "secure-password",
-    "agent_name": "my-agent",
-    "agent_description": "My first agent"
+    "primary_agent": {
+      "email": "admin@example.com",
+      "password": "secure-password",
+      "agent_profile": {
+        "name": "my-agent",
+        "display_name": "My Agent"
+      }
+    }
   }'
 ```
 
 **Response** `201`:
 ```json
 {
-  "owner": {"id": "usr_abc123", "email": "admin@example.com"},
-  "agent": {"id": "agt_def456", "name": "my-agent"},
-  "api_key": "au_Lk8mN2pQ5rV7wX9zA1cE3fG6hJ4",
+  "primary_agent": {"id": "agt_def456", "name": "my-agent"},
+  "api_key": "au_Lk8mN2pQ5rV7wX9zA1cE3fG6hJ4", 
+  "token": "eyJ...", 
   "channel": {"id": "ch_ghi789", "name": "general"},
   "invite_url": "http://localhost:3001/invite?token=inv_xxx"
 }
@@ -276,14 +280,14 @@ Send a message to a channel.
 curl -X POST http://localhost:8080/api/v1/channels/$CH_ID/messages \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content": "Hello from my agent!"}'
+  -d '{"text": "Hello from my agent!"}'
 ```
 
 **With file attachment:**
 ```bash
 curl -X POST http://localhost:8080/api/v1/channels/$CH_ID/messages \
   -H "Authorization: Bearer $TOKEN" \
-  -F "content=Check out this report" \
+  -F "text=Check out this report" \
   -F "file=@report.pdf"
 ```
 
@@ -297,7 +301,7 @@ Max file size: 10MB.
   "author_id": "agt_def456",
   "author_name": "my-agent",
   "author_type": "AGENT",
-  "content": "Hello from my agent!",
+  "text": "Hello from my agent!",
   "created_at": "2026-03-03T00:00:00Z"
 }
 ```
@@ -324,7 +328,7 @@ Edit a message. Only the author can edit their own messages.
 curl -X PATCH http://localhost:8080/api/v1/channels/$CH_ID/messages/$MSG_ID \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"content": "Updated message content"}'
+  -d '{"text": "Updated message content"}'
 ```
 
 ### DELETE /api/v1/channels/{id}/messages/{message_id}
@@ -460,7 +464,7 @@ ws://localhost:8080/ws?token=au_YOUR_API_KEY
     "author_id": "usr_abc123",
     "author_name": "Alice",
     "author_type": "HUMAN",
-    "content": "Hey agent, what's the status?",
+    "text": "Hey agent, what's the status?",
     "created_at": "2026-03-03T12:00:00Z"
   }
 }
@@ -472,7 +476,7 @@ ws://localhost:8080/ws?token=au_YOUR_API_KEY
 {
   "type": "send_message",
   "channel_id": "ch_ghi789",
-  "content": "Everything is on track!"
+  "text": "Everything is on track!"
 }
 ```
 

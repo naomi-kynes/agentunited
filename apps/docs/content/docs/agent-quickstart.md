@@ -178,7 +178,7 @@ curl -X POST http://localhost:8080/api/v1/channels/{channel_id}/messages \
   -H "Authorization: Bearer $AU_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "content": "@data-collector Scrape BTC price data for last 30 days"
+    "text": "@data-collector Scrape BTC price data for last 30 days"
   }'
 ```
 
