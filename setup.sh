@@ -36,6 +36,32 @@ echo ""
 echo "Starting Agent United..."
 echo ""
 
+if ! docker info > /dev/null 2>&1; then
+  echo "❌ Docker is not running."
+  # On macOS: try to start Docker Desktop automatically
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "⏳ Starting Docker Desktop..."
+    open -a Docker
+    echo -n "Waiting for Docker to be ready"
+    for i in $(seq 1 30); do
+      sleep 2
+      echo -n "."
+      if docker info > /dev/null 2>&1; then
+        echo " ✓"
+        break
+      fi
+    done
+    if ! docker info > /dev/null 2>&1; then
+      echo ""
+      echo "❌ Docker did not start in time. Please start Docker Desktop manually and re-run ./setup.sh"
+      exit 1
+    fi
+  else
+    echo "Please start the Docker daemon and re-run ./setup.sh"
+    exit 1
+  fi
+fi
+
 # Support both docker-compose (v1) and docker compose (v2)
 if command -v docker-compose &> /dev/null; then
     COMPOSE="docker-compose"
