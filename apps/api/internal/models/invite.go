@@ -13,12 +13,12 @@ const (
 
 // Invite represents a user invitation
 type Invite struct {
-	ID         string        `json:"id"`
-	UserID     string        `json:"user_id"`
-	Status     InviteStatus  `json:"status"`
-	ExpiresAt  time.Time     `json:"expires_at"`
-	CreatedAt  time.Time     `json:"created_at"`
-	ConsumedAt *time.Time    `json:"consumed_at,omitempty"`
+	ID         string       `json:"id"`
+	UserID     string       `json:"user_id"`
+	Status     InviteStatus `json:"status"`
+	ExpiresAt  time.Time    `json:"expires_at"`
+	CreatedAt  time.Time    `json:"created_at"`
+	ConsumedAt *time.Time   `json:"consumed_at,omitempty"`
 }
 
 // InviteWithToken includes the one-time plaintext token
@@ -29,8 +29,9 @@ type InviteWithToken struct {
 
 // InviteAcceptRequest represents invite acceptance payload
 type InviteAcceptRequest struct {
-	Token    string `json:"token" validate:"required"`
-	Password string `json:"password" validate:"required,min=12"`
+	Token       string `json:"token" validate:"required"`
+	Password    string `json:"password" validate:"required,min=12"`
+	DisplayName string `json:"display_name,omitempty"`
 }
 
 // InviteCreateRequest represents creating a new invite for a human user.

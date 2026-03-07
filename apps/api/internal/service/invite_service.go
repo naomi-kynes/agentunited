@@ -58,8 +58,8 @@ func (s *InviteService) ValidateInvite(ctx context.Context, token string) (*mode
 	return invite, user, nil
 }
 
-// AcceptInvite consumes an invite token and sets user password
-func (s *InviteService) AcceptInvite(ctx context.Context, token, password string) (string, error) {
+// AcceptInvite consumes an invite token, sets user password, and optionally persists display name.
+func (s *InviteService) AcceptInvite(ctx context.Context, token, password, displayName string) (string, error) {
 	// Validate password strength first
 	if len(password) < 12 {
 		return "", models.ErrWeakPassword
@@ -85,12 +85,15 @@ func (s *InviteService) AcceptInvite(ctx context.Context, token, password string
 		return "", fmt.Errorf("hash password: %w", err)
 	}
 
-	// Update user with password
+	// Update user with password (+ optional display name)
 	user.PasswordHash = string(passwordHash)
+	if displayName != "" {
+		user.DisplayName = displayName
+	}
 	user.UpdatedAt = time.Now()
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
-		return "", fmt.Errorf("update user password: %w", err)
+		return "", fmt.Errorf("update user password/profile: %w", err)
 	}
 
 	// Consume invite token

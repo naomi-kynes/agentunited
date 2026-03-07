@@ -150,12 +150,16 @@ func (r *PostgresUserRepository) GetByID(ctx context.Context, id string) (*model
 // Update modifies an existing user
 func (r *PostgresUserRepository) Update(ctx context.Context, user *models.User) error {
 	query := `
-		UPDATE users 
-		SET password_hash = $2, updated_at = $3
+		UPDATE users
+		SET password_hash = $2,
+			display_name = $3,
+			avatar_url = $4,
+			user_type = $5,
+			updated_at = $6
 		WHERE id = $1
 	`
 
-	result, err := r.db.Pool.Exec(ctx, query, user.ID, user.PasswordHash, user.UpdatedAt)
+	result, err := r.db.Pool.Exec(ctx, query, user.ID, user.PasswordHash, user.DisplayName, user.AvatarURL, defaultUserType(user.UserType), user.UpdatedAt)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique violation

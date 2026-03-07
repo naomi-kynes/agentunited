@@ -27,9 +27,14 @@ func (m *mockInviteService) ValidateInvite(ctx context.Context, token string) (*
 	return args.Get(0).(*models.Invite), args.Get(1).(*models.User), args.Error(2)
 }
 
-func (m *mockInviteService) AcceptInvite(ctx context.Context, token, password string) (string, error) {
-	args := m.Called(ctx, token, password)
+func (m *mockInviteService) AcceptInvite(ctx context.Context, token, password, displayName string) (string, error) {
+	args := m.Called(ctx, token, password, displayName)
 	return args.String(0), args.Error(1)
+}
+
+func (m *mockInviteService) CreateInvite(ctx context.Context, email, displayName string) (string, string, error) {
+	args := m.Called(ctx, email, displayName)
+	return args.String(0), args.String(1), args.Error(2)
 }
 
 func TestInviteHandler_ValidateInvite_HappyPath(t *testing.T) {
@@ -132,7 +137,7 @@ func TestInviteHandler_AcceptInvite_HappyPath(t *testing.T) {
 	mockService := &mockInviteService{}
 	handler := NewInviteHandler(mockService)
 
-	mockService.On("AcceptInvite", mock.Anything, "valid-token", "securepassword123").Return("jwt-token", nil)
+	mockService.On("AcceptInvite", mock.Anything, "valid-token", "securepassword123", "").Return("jwt-token", nil)
 
 	reqBody := models.InviteAcceptRequest{
 		Token:    "valid-token",
@@ -161,7 +166,7 @@ func TestInviteHandler_AcceptInvite_InvalidToken(t *testing.T) {
 	mockService := &mockInviteService{}
 	handler := NewInviteHandler(mockService)
 
-	mockService.On("AcceptInvite", mock.Anything, "invalid-token", "securepassword123").Return("", models.ErrInviteNotFound)
+	mockService.On("AcceptInvite", mock.Anything, "invalid-token", "securepassword123", "").Return("", models.ErrInviteNotFound)
 
 	reqBody := models.InviteAcceptRequest{
 		Token:    "invalid-token",

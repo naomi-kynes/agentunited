@@ -15,7 +15,7 @@ import (
 // InviteService defines invite operations
 type InviteService interface {
 	ValidateInvite(ctx context.Context, token string) (*models.Invite, *models.User, error)
-	AcceptInvite(ctx context.Context, token, password string) (string, error)
+	AcceptInvite(ctx context.Context, token, password, displayName string) (string, error)
 	CreateInvite(ctx context.Context, email, displayName string) (string, string, error)
 }
 
@@ -120,7 +120,7 @@ func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Accept invite
-	jwtToken, err := h.service.AcceptInvite(r.Context(), req.Token, req.Password)
+	jwtToken, err := h.service.AcceptInvite(r.Context(), req.Token, req.Password, req.DisplayName)
 	if err != nil {
 		switch {
 		case errors.Is(err, models.ErrInviteNotFound):
