@@ -8,8 +8,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        sans: ['Manrope', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'JetBrains Mono', 'monospace'],
       },
       fontSize: {
         xs: ['0.625rem', { lineHeight: '1rem' }],      // 10px - badges

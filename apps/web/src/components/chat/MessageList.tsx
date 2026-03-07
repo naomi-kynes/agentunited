@@ -5,6 +5,8 @@ import type { Message } from "../../types/chat"
 interface MessageListProps {
   messages: Message[]
   channelId: string
+  channelName?: string
+  isDM?: boolean
   dateLabel?: string
   onMessageUpdated?: (messageId: string, newContent: string) => void
   onMessageDeleted?: (messageId: string) => void
@@ -24,6 +26,8 @@ function isGroupedWithPrevious(current: Message, previous?: Message): boolean {
 export function MessageList({
   messages,
   channelId,
+  channelName,
+  isDM = false,
   dateLabel = "Today",
   onMessageUpdated,
   onMessageDeleted,
@@ -35,6 +39,24 @@ export function MessageList({
   const handleMessageDeleted = useCallback((messageId: string) => {
     onMessageDeleted?.(messageId)
   }, [onMessageDeleted])
+
+  if (messages.length === 0) {
+    const label = channelName || (isDM ? 'this conversation' : 'this channel')
+
+    return (
+      <div className="flex flex-1 items-center justify-center px-6 py-12">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/45 shadow-[0_0_20px_rgba(16,185,129,0.25)]">
+            <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          </div>
+          <h3 className="text-lg font-semibold tracking-tight text-foreground">
+            {isDM ? `Welcome to ${label}.` : `Welcome to #${label}.`}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">No messages yet. Start the conversation below.</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">

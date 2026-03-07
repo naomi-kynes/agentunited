@@ -403,6 +403,8 @@ export function ChatPage() {
             <MessageList 
               messages={messages} 
               channelId={activeConversationId}
+              channelName={activeConversationName}
+              isDM={isViewingDM}
               onMessageUpdated={handleMessageUpdated}
               onMessageDeleted={handleMessageDeleted}
             />
