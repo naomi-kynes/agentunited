@@ -1,78 +1,96 @@
-name: Integration Test (macOS)
+name: Integration Test (macOS self-hosted)
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
-  test:
+  integration:
     runs-on: [self-hosted, macos-local]
+    timeout-minutes: 25
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Run setup.sh
-        run: chmod +x ./setup.sh && ./setup.sh
+      - name: Ensure setup.sh is executable
+        run: chmod +x ./setup.sh
 
-      - name: Wait for services to be healthy
+      - name: Run setup
+        run: ./setup.sh
+
+      - name: Wait for services healthy
         run: |
-          echo "Waiting for services to be healthy..."
+          set -euo pipefail
+          echo "Waiting for docker compose services to become healthy/running..."
           for i in $(seq 1 30); do
-            UNHEALTHY=$(docker compose ps --format json | jq -r 'select(.Health == "starting" or .Health == "unhealthy") | .Name' 2>/dev/null)
-            if [ -z "$UNHEALTHY" ]; then
-              echo "All services healthy ✅"
+            if docker compose ps | grep -E "(unhealthy|Exit|Created|Restarting)" >/dev/null 2>&1; then
+              :
+            elif curl -sf http://localhost:8080/health >/dev/null 2>&1; then
+              echo "✅ Services are healthy/running"
+              docker compose ps
               break
             fi
-            echo "Still waiting... ($i/30)"
-            sleep 3
+
+            if [ "$i" -eq 30 ]; then
+              echo "❌ Services did not become healthy in time"
+              docker compose ps
+              docker compose logs --tail=200
+              exit 1
+            fi
+            sleep 2
           done
-          docker compose ps
 
       - name: Smoke tests
         run: |
-          BASE=http://localhost:8080/api/v1
+          set -euo pipefail
+          BASE="http://localhost:8080"
+          EMAIL="ci.$(date +%s)@example.com"
+          PASS='StrongPass123!'
 
-          echo "1. Health check..."
-          curl -sf http://localhost:8080/health || { echo "❌ Health check failed"; exit 1; }
-          echo "✅ Health OK"
+          code=$(curl -s -o /tmp/health.json -w '%{http_code}' "$BASE/health")
+          test "$code" = "200"
 
-          echo "2. Register user..."
-          RESPONSE=$(curl -sf -X POST $BASE/auth/register \
-            -H "Content-Type: application/json" \
-            -d '{"email":"ci-mac@test.com","password":"testpass123","display_name":"CI Mac"}')
-          TOKEN=$(echo $RESPONSE | jq -r '.token // empty')
-          [ -z "$TOKEN" ] && { echo "❌ Register failed: $RESPONSE"; exit 1; }
-          echo "✅ Register OK"
+          code=$(curl -s -o /tmp/register.json -w '%{http_code}' -X POST "$BASE/api/v1/auth/register" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}")
+          test "$code" = "201"
+          TOKEN=$(python3 -c "import json;print(json.load(open('/tmp/register.json'))['token'])")
 
-          echo "3. Create channel..."
-          RESPONSE=$(curl -sf -X POST $BASE/channels \
+          code=$(curl -s -o /tmp/login.json -w '%{http_code}' -X POST "$BASE/api/v1/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}")
+          test "$code" = "200"
+
+          code=$(curl -s -o /tmp/channel.json -w '%{http_code}' -X POST "$BASE/api/v1/channels" \
             -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"name":"ci-mac-test","description":"CI macOS test channel"}')
-          CHANNEL_ID=$(echo $RESPONSE | jq -r '.channel.id // .id // empty')
-          [ -z "$CHANNEL_ID" ] && { echo "❌ Create channel failed: $RESPONSE"; exit 1; }
-          echo "✅ Create channel OK"
+            -H 'Content-Type: application/json' \
+            -d '{"name":"ci-smoke","topic":"integration"}')
+          test "$code" = "201"
+          CHANNEL_ID=$(python3 -c "import json;print(json.load(open('/tmp/channel.json'))['channel']['id'])")
 
-          echo "4. Send message..."
-          curl -sf -X POST $BASE/channels/$CHANNEL_ID/messages \
+          code=$(curl -s -o /tmp/message.json -w '%{http_code}' -X POST "$BASE/api/v1/channels/$CHANNEL_ID/messages" \
             -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"content":"hello from macOS CI"}' || { echo "❌ Send message failed"; exit 1; }
-          echo "✅ Send message OK"
+            -H 'Content-Type: application/json' \
+            -d '{"text":"hello from ci"}')
+          test "$code" = "201"
 
-          echo "5. Bootstrap API..."
-          RESPONSE=$(curl -sf -X POST $BASE/bootstrap \
-            -H "Authorization: Bearer $TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"agent_name":"ci-mac-agent","display_name":"CI Mac Agent"}')
-          INVITE=$(echo $RESPONSE | jq -r '.invite_url // empty')
-          [ -z "$INVITE" ] && { echo "❌ Bootstrap failed: $RESPONSE"; exit 1; }
-          echo "✅ Bootstrap OK — invite_url present"
+          code=$(curl -s -o /tmp/messages.json -w '%{http_code}' "$BASE/api/v1/channels/$CHANNEL_ID/messages" \
+            -H "Authorization: Bearer $TOKEN")
+          test "$code" = "200"
+          python3 -c "import json; msgs=json.load(open('/tmp/messages.json')).get('messages',[]); assert any(m.get('text')=='hello from ci' for m in msgs)"
 
-          echo ""
-          echo "All macOS smoke tests passed ✅"
+          BOOT_EMAIL="bootstrap.$(date +%s)@example.com"
+          code=$(curl -s -o /tmp/bootstrap.json -w '%{http_code}' -X POST "$BASE/api/v1/bootstrap" \
+            -H 'Content-Type: application/json' \
+            -d "{\"primary_agent\":{\"email\":\"$BOOT_EMAIL\",\"password\":\"BootstrapPass123!\",\"agent_profile\":{\"name\":\"cloudy\",\"display_name\":\"Cloudy\"}},\"humans\":[{\"email\":\"human.$(date +%s)@example.com\",\"display_name\":\"CI Human\",\"role\":\"member\"}],\"default_channel\":{\"name\":\"general\",\"topic\":\"CI bootstrap\"}}")
+          if [ "$code" != "200" ] && [ "$code" != "201" ]; then
+            echo "Unexpected bootstrap status: $code"
+            cat /tmp/bootstrap.json
+            exit 1
+          fi
+          python3 -c "import json; j=json.load(open('/tmp/bootstrap.json')); h=j.get('humans',[]); assert h and h[0].get('invite_url')"
 
       - name: Cleanup
         if: always()
-        run: docker compose down -v
+        run: docker compose down
