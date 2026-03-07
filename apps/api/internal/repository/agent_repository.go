@@ -12,6 +12,7 @@ type AgentRepository interface {
 	Create(ctx context.Context, agent *models.Agent) error
 	Get(ctx context.Context, id string) (*models.Agent, error)
 	ListByOwner(ctx context.Context, ownerID string) ([]*models.Agent, error)
+	ListAll(ctx context.Context) ([]*models.Agent, error)
 	Update(ctx context.Context, agent *models.Agent) error
 	Delete(ctx context.Context, id string) error
 }
@@ -27,7 +28,7 @@ func NewAgentRepository(db *DB) AgentRepository {
 
 func (r *agentRepository) Create(ctx context.Context, agent *models.Agent) error {
 	metadataJSON, _ := json.Marshal(agent.Metadata)
-	
+
 	var query string
 	var err error
 
@@ -52,7 +53,7 @@ func (r *agentRepository) Create(ctx context.Context, agent *models.Agent) error
 			agent.OwnerID, agent.Name, agent.DisplayName, agent.Description, agent.AvatarURL, metadataJSON,
 		).Scan(&agent.ID, &agent.CreatedAt, &agent.UpdatedAt)
 	}
-	
+
 	return err
 }
 
@@ -80,6 +81,34 @@ func (r *agentRepository) ListByOwner(ctx context.Context, ownerID string) ([]*m
 		FROM agents WHERE owner_id = $1 ORDER BY created_at DESC
 	`
 	rows, err := r.db.Pool.Query(ctx, query, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var agents []*models.Agent
+	for rows.Next() {
+		agent := &models.Agent{}
+		var metadataJSON []byte
+		err := rows.Scan(
+			&agent.ID, &agent.OwnerID, &agent.Name, &agent.DisplayName, &agent.Description,
+			&agent.AvatarURL, &metadataJSON, &agent.CreatedAt, &agent.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		json.Unmarshal(metadataJSON, &agent.Metadata)
+		agents = append(agents, agent)
+	}
+	return agents, nil
+}
+
+func (r *agentRepository) ListAll(ctx context.Context) ([]*models.Agent, error) {
+	query := `
+		SELECT id, owner_id, name, display_name, description, avatar_url, metadata, created_at, updated_at
+		FROM agents ORDER BY created_at DESC
+	`
+	rows, err := r.db.Pool.Query(ctx, query)
 	if err != nil {
 		return nil, err
 	}

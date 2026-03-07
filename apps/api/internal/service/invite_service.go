@@ -2,13 +2,17 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/agentunited/backend/internal/models"
 	"github.com/agentunited/backend/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -17,6 +21,7 @@ type InviteService struct {
 	userRepo   repository.UserRepository
 	inviteRepo repository.InviteRepository
 	jwtSecret  string
+	baseURL    string
 }
 
 // NewInviteService creates a new invite service
@@ -24,11 +29,13 @@ func NewInviteService(
 	userRepo repository.UserRepository,
 	inviteRepo repository.InviteRepository,
 	jwtSecret string,
+	baseURL string,
 ) *InviteService {
 	return &InviteService{
 		userRepo:   userRepo,
 		inviteRepo: inviteRepo,
 		jwtSecret:  jwtSecret,
+		baseURL:    baseURL,
 	}
 }
 
@@ -100,10 +107,69 @@ func (s *InviteService) AcceptInvite(ctx context.Context, token, password string
 	return jwtToken, nil
 }
 
+// CreateInvite creates a new invite for a human user and returns plaintext token + URL.
+func (s *InviteService) CreateInvite(ctx context.Context, email, displayName string) (string, string, error) {
+	var userID string
+
+	if existing, err := s.userRepo.GetByEmail(ctx, email); err == nil {
+		userID = existing.ID
+	} else {
+		userID = uuid.New().String()
+		human := &models.User{
+			ID:           userID,
+			Email:        email,
+			DisplayName:  displayName,
+			PasswordHash: "",
+			CreatedAt:    time.Now(),
+			UpdatedAt:    time.Now(),
+		}
+		if err := s.userRepo.Create(ctx, human); err != nil {
+			return "", "", fmt.Errorf("create invite user: %w", err)
+		}
+	}
+
+	token, tokenHash, err := s.generateInviteToken()
+	if err != nil {
+		return "", "", err
+	}
+
+	invite := &models.Invite{
+		ID:        uuid.New().String(),
+		UserID:    userID,
+		Status:    models.InviteStatusPending,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
+		CreatedAt: time.Now(),
+	}
+	if err := s.inviteRepo.Create(ctx, invite, tokenHash); err != nil {
+		return "", "", fmt.Errorf("create invite: %w", err)
+	}
+
+	return token, s.createInviteURL(token), nil
+}
+
 // hashToken creates a SHA-256 hash of the token
 func (s *InviteService) hashToken(token string) string {
 	hash := sha256.Sum256([]byte(token))
 	return fmt.Sprintf("%x", hash)
+}
+
+func (s *InviteService) generateInviteToken() (string, string, error) {
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", "", fmt.Errorf("generate random bytes: %w", err)
+	}
+	token := "inv_" + base64.URLEncoding.EncodeToString(randomBytes)
+	hash := sha256.Sum256([]byte(token))
+	return token, fmt.Sprintf("%x", hash), nil
+}
+
+func (s *InviteService) createInviteURL(token string) string {
+	u, _ := url.Parse(s.baseURL)
+	u.Path = "/invite"
+	q := u.Query()
+	q.Set("token", token)
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // generateJWTToken creates a JWT token for the user

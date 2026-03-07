@@ -18,6 +18,7 @@ type UserRepository interface {
 	Update(ctx context.Context, user *models.User) error
 	UpdateProfile(ctx context.Context, id, displayName, avatarURL string) error
 	Count(ctx context.Context) (int64, error)
+	List(ctx context.Context) ([]*models.User, error)
 }
 
 // PostgresUserRepository implements UserRepository with PostgreSQL
@@ -197,4 +198,29 @@ func (r *PostgresUserRepository) Count(ctx context.Context) (int64, error) {
 	}
 
 	return count, nil
+}
+
+// List returns all users in the instance.
+func (r *PostgresUserRepository) List(ctx context.Context) ([]*models.User, error) {
+	query := `
+		SELECT id, email, COALESCE(display_name, ''), COALESCE(avatar_url, ''), password_hash, created_at, updated_at
+		FROM users
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.Pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+	defer rows.Close()
+
+	var users []*models.User
+	for rows.Next() {
+		u := &models.User{}
+		if err := rows.Scan(&u.ID, &u.Email, &u.DisplayName, &u.AvatarURL, &u.PasswordHash, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+	return users, nil
 }

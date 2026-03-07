@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	mw "github.com/agentunited/backend/internal/api/middleware"
 	"github.com/agentunited/backend/internal/models"
 	"github.com/go-playground/validator/v10"
 	"github.com/rs/zerolog/log"
@@ -15,6 +16,7 @@ import (
 type InviteService interface {
 	ValidateInvite(ctx context.Context, token string) (*models.Invite, *models.User, error)
 	AcceptInvite(ctx context.Context, token, password string) (string, error)
+	CreateInvite(ctx context.Context, email, displayName string) (string, string, error)
 }
 
 // InviteHandler handles invite requests
@@ -66,6 +68,42 @@ func (h *InviteHandler) ValidateInvite(w http.ResponseWriter, r *http.Request) {
 }
 
 // AcceptInvite handles POST /api/v1/invite/accept
+func (h *InviteHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
+	if _, ok := mw.GetUserID(r.Context()); !ok {
+		respondError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	var req models.InviteCreateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	if req.Role == "" {
+		req.Role = "member"
+	}
+	if req.Role != "member" {
+		respondError(w, http.StatusBadRequest, "role must be member")
+		return
+	}
+	if err := h.validator.Struct(&req); err != nil {
+		respondError(w, http.StatusBadRequest, "validation failed: "+err.Error())
+		return
+	}
+
+	token, inviteURL, err := h.service.CreateInvite(r.Context(), req.Email, req.DisplayName)
+	if err != nil {
+		log.Error().Err(err).Msg("create invite failed")
+		respondError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]string{
+		"invite_token": token,
+		"invite_url":   inviteURL,
+	})
+}
+
 func (h *InviteHandler) AcceptInvite(w http.ResponseWriter, r *http.Request) {
 	var req models.InviteAcceptRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

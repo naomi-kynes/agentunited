@@ -42,7 +42,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 
 	// CORS
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*"},
+		AllowedOrigins:   []string{"http://localhost:*", "http://127.0.0.1:*", "https://*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type"},
 		ExposedHeaders:   []string{"Link"},
@@ -82,7 +82,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	billingProvider := billing.NewStub(cfg.Stripe.SecretKey != "" && cfg.Stripe.PriceIDPro != "")
 	billingService := service.NewBillingService(subscriptionRepo, billingProvider, cfg.Stripe.WebhookSecret, cfg.Stripe.PriceIDPro)
 	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, cfg.JWT.Secret, "http://localhost:8080")
-	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret)
+	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret, "http://localhost:3001")
 
 	// Initialize WebSocket hub first (needed by message handler)
 	hub := handlers.NewHub()
@@ -99,6 +99,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	webhookHandler := handlers.NewWebhookHandler(webhookService)
 	bootstrapHandler := handlers.NewBootstrapHandler(bootstrapService)
 	inviteHandler := handlers.NewInviteHandler(inviteService)
+	usersHandler := handlers.NewUsersHandler(userRepo, agentRepo)
 	pairingHandler := handlers.NewPairingHandler()
 	centrifugoHandler := handlers.NewCentrifugoHandler(realtimeEngine, channelService)
 	wsHandler := handlers.NewWebSocketHandlerV2(messageService, channelService, cfg.JWT.Secret, hub)
@@ -132,6 +133,10 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/me", meHandler.GetMe)
 		r.Put("/me", meHandler.UpdateMe)
 		r.Post("/me/password", meHandler.ChangePassword)
+
+		// Users/invites routes
+		r.Get("/users", usersHandler.List)
+		r.Post("/invites", inviteHandler.CreateInvite)
 
 		// Integrations routes
 		r.Get("/integrations", integrationHandler.List)
@@ -221,6 +226,10 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/me", meHandler.GetMe)
 		r.Put("/me", meHandler.UpdateMe)
 		r.Post("/me/password", meHandler.ChangePassword)
+
+		// Users/invites routes
+		r.Get("/users", usersHandler.List)
+		r.Post("/invites", inviteHandler.CreateInvite)
 
 		// Integrations routes
 		r.Get("/integrations", integrationHandler.List)

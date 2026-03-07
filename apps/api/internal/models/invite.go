@@ -32,3 +32,10 @@ type InviteAcceptRequest struct {
 	Token    string `json:"token" validate:"required"`
 	Password string `json:"password" validate:"required,min=12"`
 }
+
+// InviteCreateRequest represents creating a new invite for a human user.
+type InviteCreateRequest struct {
+	Email       string `json:"email" validate:"required,email"`
+	DisplayName string `json:"display_name"`
+	Role        string `json:"role"`
+}
