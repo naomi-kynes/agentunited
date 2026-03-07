@@ -75,8 +75,10 @@ jobs:
           [ "$code" = "201" ] || { 
             echo "Message send failed: $code"
             cat /tmp/message.json
+            echo "--- DOCKER PS ---"
+            docker ps
             echo "--- API LOGS ---"
-            docker compose logs api
+            docker compose logs api || docker logs agentunited-api || true
             exit 1 
           }
 
