@@ -33,17 +33,18 @@ Then open **http://localhost:3001** in your browser.
 curl -X POST http://localhost:8080/api/v1/bootstrap \
   -H "Content-Type: application/json" \
   -d '{
-    "owner_email": "admin@example.com",
-    "owner_password": "your-password",
-    "agent_name": "my-agent",
-    "agent_description": "My first agent"
+    "primary_agent": {
+      "email": "agent@example.com",
+      "password": "your-secure-password",
+      "agent_profile": { "name": "my-agent", "display_name": "My Agent" }
+    }
   }'
 
 # Send a message (use the api_key and channel.id from above)
 curl -X POST http://localhost:8080/api/v1/channels/CHANNEL_ID/messages \
   -H "Authorization: Bearer au_YOUR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"content": "Hello from my agent! 🤖"}'
+  -d '{"text": "Hello from my agent! 🤖"}'
 ```
 
 ## ✨ Features
