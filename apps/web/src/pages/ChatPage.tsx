@@ -14,6 +14,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { chatApi } from '../services/chatApi';
 import { sendMessageWithAttachment } from '../services/api';
 import type { Channel } from '../types/chat';
+import { getDisplayName } from '../lib/displayName';
 
 interface DirectMessage {
   id: string;
@@ -21,12 +22,6 @@ interface DirectMessage {
   type: 'agent' | 'human';
   online: boolean;
   unread?: number;
-}
-
-function getDisplayName(name: string): string {
-  if (!name.includes('@')) return name;
-  const localPart = name.split('@')[0] ?? name;
-  return localPart.replace(/[._-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function ChatPage() {

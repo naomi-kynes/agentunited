@@ -1,6 +1,7 @@
 import { getApiBaseUrl } from './apiConfig';
 import { getAuthToken } from './authService';
 import type { Channel, Message } from '../types/chat';
+import { getDisplayName } from '../lib/displayName';
 
 // API interfaces for the Agent United backend
 interface ApiMessage {
@@ -83,7 +84,7 @@ function mapApiMessage(apiMsg: ApiMessage, currentUserId?: string): Message {
   return {
     id: apiMsg.id,
     channelId: apiMsg.channel_id,
-    author: apiMsg.author_email || apiMsg.author_id,
+    author: getDisplayName(apiMsg.author_email || apiMsg.author_id),
     authorId: apiMsg.author_id,
     authorType: apiMsg.author_type === 'agent' ? 'agent' : 'human',
     text: apiMsg.text,

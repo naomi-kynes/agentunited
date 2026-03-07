@@ -6,6 +6,7 @@ import { TypeBadge } from "../ui/TypeBadge"
 import { ThemeToggle } from "../ui/ThemeToggle"
 import { ChannelContextMenu } from "./ChannelContextMenu"
 import type { Channel } from "../../types/chat"
+import { getDisplayName } from "../../lib/displayName"
 
 interface DirectMessage {
   id: string
@@ -28,17 +29,6 @@ interface ChatSidebarProps {
   onChannelUpdate?: (channel: Channel) => void
   onChannelDelete?: (channelId: string) => void
   onOpenSettings?: () => void
-}
-
-function getDisplayName(name: string): string {
-  if (name.includes('@')) {
-    const localPart = name.split('@')[0] ?? name
-    return localPart
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase())
-  }
-
-  return name
 }
 
 export function ChatSidebar({
