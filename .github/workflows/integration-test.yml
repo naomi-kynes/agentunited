@@ -12,16 +12,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Pre-clean docker state
+        run: docker compose down -v --remove-orphans || true
+
       - name: Run setup.sh
-        run: ./setup.sh
+        run: chmod +x ./setup.sh && ./setup.sh
 
       - name: Wait for services healthy
         run: |
+          set -euo pipefail
           echo "Waiting for services..."
           for i in $(seq 1 30); do
             if docker compose ps | grep -v "healthy" | grep -q "starting\|unhealthy"; then
               sleep 2
             else
+              curl -sf http://localhost:8080/health >/dev/null
               echo "All services ready"
               break
             fi
@@ -29,42 +34,62 @@ jobs:
 
       - name: Smoke tests
         run: |
+          set -euo pipefail
           BASE=http://localhost:8080/api/v1
 
           # Health check
-          curl -sf $BASE/../health || exit 1
+          curl -sf http://localhost:8080/health >/dev/null
 
           # Register
-          TOKEN=$(curl -sf -X POST $BASE/auth/register \
+          REGISTER=$(curl -sf -X POST $BASE/auth/register \
             -H "Content-Type: application/json" \
-            -d '{"email":"ci@test.com","password":"testpass123","display_name":"CI Bot"}' \
-            | jq -r '.token')
-          [ -z "$TOKEN" ] && exit 1
+            -d '{"email":"ci@test.com","password":"testpass123"}')
+          TOKEN=$(echo "$REGISTER" | jq -r '.token // empty')
+          [ -z "$TOKEN" ] && { echo "register failed: $REGISTER"; exit 1; }
 
           # Create channel
-          CHANNEL_ID=$(curl -sf -X POST $BASE/channels \
+          CHANNEL_RESP=$(curl -sf -X POST $BASE/channels \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"name":"ci-test","description":"CI test channel"}' \
-            | jq -r '.id')
-          [ -z "$CHANNEL_ID" ] && exit 1
+            -d '{"name":"ci-test","topic":"CI test channel"}')
+          CHANNEL_ID=$(echo "$CHANNEL_RESP" | jq -r '.channel.id // .id // empty')
+          [ -z "$CHANNEL_ID" ] && { echo "channel create failed: $CHANNEL_RESP"; exit 1; }
 
           # Send message
           curl -sf -X POST $BASE/channels/$CHANNEL_ID/messages \
             -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/json" \
-            -d '{"content":"hello from CI"}' || exit 1
+            -d '{"text":"hello from CI"}' >/dev/null
 
           # Bootstrap
-          INVITE=$(curl -sf -X POST $BASE/bootstrap \
-            -H "Authorization: Bearer $TOKEN" \
+          BOOTSTRAP=$(curl -sf -X POST $BASE/bootstrap \
             -H "Content-Type: application/json" \
-            -d '{"agent_name":"ci-agent","display_name":"CI Agent"}' \
-            | jq -r '.invite_url')
-          [ -z "$INVITE" ] && exit 1
+            -d '{
+              "primary_agent": {
+                "email": "agent@example.com",
+                "password": "BootstrapPass123!",
+                "agent_profile": {
+                  "name": "ci-agent",
+                  "display_name": "CI Agent"
+                }
+              },
+              "humans": [
+                {
+                  "email": "human@example.com",
+                  "display_name": "CI Human",
+                  "role": "member"
+                }
+              ],
+              "default_channel": {
+                "name": "general",
+                "topic": "CI bootstrap"
+              }
+            }')
+          INVITE=$(echo "$BOOTSTRAP" | jq -r '.invite_url // .humans[0].invite_url // empty')
+          [ -z "$INVITE" ] && { echo "bootstrap parse failed: $BOOTSTRAP"; exit 1; }
 
           echo "All smoke tests passed ✅"
 
       - name: Cleanup
         if: always()
-        run: docker compose down -v
+        run: docker compose down -v --remove-orphans
