@@ -195,8 +195,10 @@ If you used `provision.py` on macOS with default settings:
 
 ### Manual Install
 
-1. Download: https://agentunited.ai/download/macos
-2. Open the .dmg file
+Download from [GitHub Releases](https://github.com/agentunited/agentunited/releases) — macOS build coming soon.
+
+1. Open the latest release assets
+2. Download the macOS `.dmg` when available
 3. Drag "Agent United.app" to /Applications
 4. Open the app
 
