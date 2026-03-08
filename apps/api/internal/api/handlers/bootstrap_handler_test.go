@@ -28,7 +28,7 @@ func (m *mockBootstrapService) Bootstrap(ctx context.Context, req *models.Bootst
 
 func TestBootstrapHandler_Bootstrap_HappyPath(t *testing.T) {
 	mockService := &mockBootstrapService{}
-	handler := NewBootstrapHandler(mockService)
+	handler := NewBootstrapHandler(mockService, nil)
 
 	// Mock service response
 	mockResp := &models.BootstrapResponse{
@@ -122,7 +122,7 @@ func TestBootstrapHandler_Bootstrap_HappyPath(t *testing.T) {
 
 func TestBootstrapHandler_Bootstrap_InstanceAlreadyBootstrapped(t *testing.T) {
 	mockService := &mockBootstrapService{}
-	handler := NewBootstrapHandler(mockService)
+	handler := NewBootstrapHandler(mockService, nil)
 
 	mockService.On("Bootstrap", mock.Anything, mock.AnythingOfType("*models.BootstrapRequest")).Return(nil, models.ErrInstanceAlreadyBootstrapped)
 
@@ -156,7 +156,7 @@ func TestBootstrapHandler_Bootstrap_InstanceAlreadyBootstrapped(t *testing.T) {
 
 func TestBootstrapHandler_Bootstrap_InvalidJSON(t *testing.T) {
 	mockService := &mockBootstrapService{}
-	handler := NewBootstrapHandler(mockService)
+	handler := NewBootstrapHandler(mockService, nil)
 
 	req, _ := http.NewRequest("POST", "/api/v1/bootstrap", bytes.NewBufferString("invalid json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -174,7 +174,7 @@ func TestBootstrapHandler_Bootstrap_InvalidJSON(t *testing.T) {
 
 func TestBootstrapHandler_Bootstrap_ValidationError(t *testing.T) {
 	mockService := &mockBootstrapService{}
-	handler := NewBootstrapHandler(mockService)
+	handler := NewBootstrapHandler(mockService, nil)
 
 	// Missing required fields
 	reqBody := models.BootstrapRequest{

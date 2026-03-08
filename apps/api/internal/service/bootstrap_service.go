@@ -7,24 +7,30 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/agentunited/backend/internal/models"
 	"github.com/agentunited/backend/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // BootstrapService handles instance bootstrapping
 type BootstrapService struct {
-	userRepo    repository.UserRepository
-	agentRepo   repository.AgentRepository
-	apiKeyRepo  repository.APIKeyRepository
-	inviteRepo  repository.InviteRepository
-	channelRepo repository.ChannelRepository
-	jwtSecret   string
-	baseURL     string
+	userRepo         repository.UserRepository
+	agentRepo        repository.AgentRepository
+	apiKeyRepo       repository.APIKeyRepository
+	inviteRepo       repository.InviteRepository
+	channelRepo      repository.ChannelRepository
+	subscriptionRepo repository.SubscriptionRepository
+	jwtSecret        string
+	inviteBaseURL    string
+	relayDomain      string
+	redisClient      *redis.Client
 }
 
 // NewBootstrapService creates a new bootstrap service
@@ -34,34 +40,48 @@ func NewBootstrapService(
 	apiKeyRepo repository.APIKeyRepository,
 	inviteRepo repository.InviteRepository,
 	channelRepo repository.ChannelRepository,
+	subscriptionRepo repository.SubscriptionRepository,
 	jwtSecret string,
-	baseURL string,
+	inviteBaseURL string,
+	relayDomain string,
+	redisClient *redis.Client,
 ) *BootstrapService {
 	return &BootstrapService{
-		userRepo:    userRepo,
-		agentRepo:   agentRepo,
-		apiKeyRepo:  apiKeyRepo,
-		inviteRepo:  inviteRepo,
-		channelRepo: channelRepo,
-		jwtSecret:   jwtSecret,
-		baseURL:     baseURL,
+		userRepo:         userRepo,
+		agentRepo:        agentRepo,
+		apiKeyRepo:       apiKeyRepo,
+		inviteRepo:       inviteRepo,
+		channelRepo:      channelRepo,
+		subscriptionRepo: subscriptionRepo,
+		jwtSecret:        jwtSecret,
+		inviteBaseURL:    inviteBaseURL,
+		relayDomain:      relayDomain,
+		redisClient:      redisClient,
 	}
 }
 
 // Bootstrap performs atomic instance provisioning
 func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapRequest) (*models.BootstrapResponse, error) {
-	// Check if instance already bootstrapped
+	// Validate request
+	if err := s.validateRequest(req); err != nil {
+		return nil, err
+	}
+
+	if existingUser, err := s.userRepo.GetByEmail(ctx, req.PrimaryAgent.Email); err == nil {
+		if bcrypt.CompareHashAndPassword([]byte(existingUser.PasswordHash), []byte(req.PrimaryAgent.Password)) != nil {
+			return nil, models.ErrInstanceAlreadyBootstrapped
+		}
+		return s.bootstrapRecoveryResponse(ctx, existingUser)
+	} else if err != nil && err != models.ErrUserNotFound {
+		return nil, fmt.Errorf("lookup primary user: %w", err)
+	}
+
 	userCount, err := s.userRepo.Count(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("check user count: %w", err)
 	}
 	if userCount > 0 {
 		return nil, models.ErrInstanceAlreadyBootstrapped
-	}
-
-	// Validate request
-	if err := s.validateRequest(req); err != nil {
-		return nil, err
 	}
 
 	// Generate UUIDs upfront for relationships
@@ -118,6 +138,26 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 		return nil, fmt.Errorf("generate JWT token: %w", err)
 	}
 
+	// Generate relay credentials for this workspace
+	relayToken, relaySubdomain := s.generateRelayCredentials(instanceID)
+	relayURL := fmt.Sprintf("https://%s.%s", relaySubdomain, s.relayDomain)
+	_ = s.persistRelayProvisioning(ctx, relayToken, relaySubdomain)
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC()
+	if err := s.subscriptionRepo.UpsertByWorkspace(ctx, &models.Subscription{
+		WorkspaceID:           primaryUserID,
+		Plan:                  "free",
+		Status:                "active",
+		RelayTier:             "free",
+		RelayBandwidthUsedMB:  0,
+		RelayBandwidthLimitMB: 1024,
+		RelayConnectionsMax:   3,
+		RelayCustomSubdomain:  false,
+		RelaySubdomain:        relaySubdomain,
+		RelayExpiresAt:        &expiresAt,
+	}); err != nil {
+		return nil, fmt.Errorf("create relay subscription defaults: %w", err)
+	}
+
 	// Prepare response
 	resp := &models.BootstrapResponse{
 		PrimaryAgent: models.BootstrapPrimaryAgentResponse{
@@ -128,9 +168,14 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 			APIKey:   primaryAPIKeyPlaintext,
 			APIKeyID: primaryAPIKey.ID,
 		},
-		Agents:     []models.BootstrapAgentResponse{},
-		Humans:     []models.BootstrapHumanResponse{},
-		InstanceID: instanceID,
+		Agents:                []models.BootstrapAgentResponse{},
+		Humans:                []models.BootstrapHumanResponse{},
+		InstanceID:            instanceID,
+		RelayToken:            relayToken,
+		RelaySubdomain:        relaySubdomain,
+		RelayURL:              relayURL,
+		RelayTier:             "free",
+		RelayBandwidthLimitMB: 1024,
 	}
 
 	// Create additional agents
@@ -255,6 +300,46 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 	return resp, nil
 }
 
+func (s *BootstrapService) bootstrapRecoveryResponse(ctx context.Context, existingUser *models.User) (*models.BootstrapResponse, error) {
+	agents, err := s.agentRepo.ListByOwner(ctx, existingUser.ID)
+	if err != nil || len(agents) == 0 {
+		return nil, models.ErrInstanceAlreadyBootstrapped
+	}
+	apiKey, plaintext, err := s.generateAPIKey(ctx, agents[0].ID, "recovery")
+	if err != nil {
+		return nil, fmt.Errorf("create recovery api key: %w", err)
+	}
+	jwtToken, err := s.generateJWTToken(existingUser.ID, existingUser.Email)
+	if err != nil {
+		return nil, fmt.Errorf("generate recovery jwt: %w", err)
+	}
+	sub, err := s.subscriptionRepo.GetByWorkspace(ctx, existingUser.ID)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			return nil, models.ErrInstanceAlreadyBootstrapped
+		}
+		return nil, fmt.Errorf("lookup existing relay subscription: %w", err)
+	}
+	relayURL := ""
+	if sub.RelaySubdomain != "" {
+		relayURL = fmt.Sprintf("https://%s.%s", sub.RelaySubdomain, s.relayDomain)
+	}
+	return &models.BootstrapResponse{
+		PrimaryAgent: models.BootstrapPrimaryAgentResponse{
+			UserID:   existingUser.ID,
+			AgentID:  agents[0].ID,
+			Email:    existingUser.Email,
+			JWTToken: jwtToken,
+			APIKey:   plaintext,
+			APIKeyID: apiKey.ID,
+		},
+		RelaySubdomain:        sub.RelaySubdomain,
+		RelayURL:              relayURL,
+		RelayTier:             sub.RelayTier,
+		RelayBandwidthLimitMB: sub.RelayBandwidthLimitMB,
+	}, nil
+}
+
 // validateRequest validates the bootstrap request
 func (s *BootstrapService) validateRequest(req *models.BootstrapRequest) error {
 	// Basic validation would be handled by struct tags in handlers
@@ -327,10 +412,30 @@ func (s *BootstrapService) generateJWTToken(userID, email string) (string, error
 
 // createInviteURL creates a full invite URL
 func (s *BootstrapService) createInviteURL(token string) string {
-	u, _ := url.Parse(s.baseURL)
+	u, _ := url.Parse(s.inviteBaseURL)
 	u.Path = "/invite"
 	q := u.Query()
 	q.Set("token", token)
 	u.RawQuery = q.Encode()
 	return u.String()
+}
+
+func (s *BootstrapService) generateRelayCredentials(instanceID string) (string, string) {
+	token := "rt_" + strings.ReplaceAll(uuid.NewString(), "-", "")
+	sub := strings.ToLower(strings.ReplaceAll(instanceID, "-", ""))
+	if len(sub) > 8 {
+		sub = sub[:8]
+	}
+	return token, "w" + sub
+}
+
+func (s *BootstrapService) persistRelayProvisioning(ctx context.Context, token, subdomain string) error {
+	if s.redisClient == nil || token == "" || subdomain == "" {
+		return nil
+	}
+	pipe := s.redisClient.TxPipeline()
+	pipe.Set(ctx, "relay:provision:token:"+token, subdomain, 24*time.Hour)
+	pipe.Set(ctx, "relay:provision:subdomain:"+subdomain, token, 24*time.Hour)
+	_, err := pipe.Exec(ctx)
+	return err
 }

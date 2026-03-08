@@ -4,10 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/agentunited/backend/internal/models"
 	"github.com/go-playground/validator/v10"
+	"github.com/redis/go-redis/v9"
 	"github.com/rs/zerolog/log"
 )
 
@@ -18,21 +23,32 @@ type BootstrapService interface {
 
 // BootstrapHandler handles bootstrap requests
 type BootstrapHandler struct {
-	service   BootstrapService
-	validator *validator.Validate
+	service     BootstrapService
+	validator   *validator.Validate
+	redisClient *redis.Client
 }
 
 // NewBootstrapHandler creates a new bootstrap handler
-func NewBootstrapHandler(service BootstrapService) *BootstrapHandler {
+func NewBootstrapHandler(service BootstrapService, redisClient *redis.Client) *BootstrapHandler {
 	return &BootstrapHandler{
-		service:   service,
-		validator: validator.New(),
+		service:     service,
+		validator:   validator.New(),
+		redisClient: redisClient,
 	}
 }
 
 func (h *BootstrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if blocked, err := h.rateLimitBootstrap(r.Context(), clientIP(r)); err != nil {
+		log.Error().Err(err).Msg("bootstrap rate limit check failed")
+		respondError(w, http.StatusInternalServerError, "internal server error")
+		return
+	} else if blocked {
+		respondError(w, http.StatusTooManyRequests, "bootstrap rate limit exceeded: max 3 requests per IP per day")
 		return
 	}
 
@@ -58,7 +74,7 @@ func (h *BootstrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusConflict, "instance has already been bootstrapped")
 			return
 		}
-		
+
 		log.Error().Err(err).Msg("bootstrap failed")
 		respondError(w, http.StatusInternalServerError, "internal server error")
 		return
@@ -66,6 +82,37 @@ func (h *BootstrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Return response
 	respondJSON(w, http.StatusCreated, resp)
+}
+
+func (h *BootstrapHandler) rateLimitBootstrap(ctx context.Context, ip string) (bool, error) {
+	if h.redisClient == nil || ip == "" {
+		return false, nil
+	}
+	now := time.Now().UTC()
+	key := fmt.Sprintf("rate:bootstrap:%s:%s", ip, now.Format("2006-01-02"))
+	count, err := h.redisClient.Incr(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+	if count == 1 {
+		expires := time.Date(now.Year(), now.Month(), now.Day()+1, 0, 0, 0, 0, time.UTC)
+		_ = h.redisClient.ExpireAt(ctx, key, expires).Err()
+	}
+	return count > 3, nil
+}
+
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 func respondError(w http.ResponseWriter, code int, message string) {

@@ -81,8 +81,9 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	integrationService := service.NewIntegrationService(integrationRepo, webhookService)
 	billingProvider := billing.NewStub(cfg.Stripe.SecretKey != "" && cfg.Stripe.PriceIDPro != "")
 	billingService := service.NewBillingService(subscriptionRepo, billingProvider, cfg.Stripe.WebhookSecret, cfg.Stripe.PriceIDPro)
-	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, cfg.JWT.Secret, "http://localhost:8080")
+	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, subscriptionRepo, cfg.JWT.Secret, "https://agentunited.ai", cfg.Relay.Domain, cache.Client)
 	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret, "http://localhost:3001")
+	relayService := service.NewRelayService(subscriptionRepo, cfg.Relay.Domain)
 
 	// Initialize WebSocket hub first (needed by message handler)
 	hub := handlers.NewHub()
@@ -97,8 +98,9 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	agentHandler := handlers.NewAgentHandler(agentService)
 	apiKeyHandler := handlers.NewAPIKeyHandler(apiKeyService)
 	webhookHandler := handlers.NewWebhookHandler(webhookService)
-	bootstrapHandler := handlers.NewBootstrapHandler(bootstrapService)
+	bootstrapHandler := handlers.NewBootstrapHandler(bootstrapService, cache.Client)
 	inviteHandler := handlers.NewInviteHandler(inviteService)
+	relayHandler := handlers.NewRelayHandler(relayService)
 	usersHandler := handlers.NewUsersHandler(userRepo)
 	pairingHandler := handlers.NewPairingHandler()
 	centrifugoHandler := handlers.NewCentrifugoHandler(realtimeEngine, channelService)
@@ -146,6 +148,9 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		// Billing routes
 		r.Get("/billing/checkout", billingHandler.Checkout)
 		r.Get("/billing/portal", billingHandler.Portal)
+
+		// Relay routes
+		r.Get("/relay/status", relayHandler.Status)
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
@@ -239,6 +244,9 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		// Billing routes
 		r.Get("/billing/checkout", billingHandler.Checkout)
 		r.Get("/billing/portal", billingHandler.Portal)
+
+		// Relay routes
+		r.Get("/relay/status", relayHandler.Status)
 
 		// Admin routes
 		r.Route("/admin", func(r chi.Router) {
