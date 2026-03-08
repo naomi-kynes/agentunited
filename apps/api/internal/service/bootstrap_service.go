@@ -84,6 +84,10 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 		return nil, models.ErrInstanceAlreadyBootstrapped
 	}
 
+	if err := s.checkBootstrapEntityLimit(req); err != nil {
+		return nil, err
+	}
+
 	// Generate UUIDs upfront for relationships
 	primaryUserID := uuid.New().String()
 	primaryAgentID := uuid.New().String()
@@ -298,6 +302,14 @@ func (s *BootstrapService) Bootstrap(ctx context.Context, req *models.BootstrapR
 	}
 
 	return resp, nil
+}
+
+func (s *BootstrapService) checkBootstrapEntityLimit(req *models.BootstrapRequest) error {
+	projected := 1 + len(req.Humans) + len(req.Agents)
+	if projected > 3 {
+		return models.ErrEntityLimitReached
+	}
+	return nil
 }
 
 func (s *BootstrapService) bootstrapRecoveryResponse(ctx context.Context, existingUser *models.User) (*models.BootstrapResponse, error) {

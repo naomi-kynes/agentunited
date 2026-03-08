@@ -16,7 +16,7 @@ import (
 type InviteService interface {
 	ValidateInvite(ctx context.Context, token string) (*models.Invite, *models.User, error)
 	AcceptInvite(ctx context.Context, token, password, displayName string) (string, error)
-	CreateInvite(ctx context.Context, email, displayName string) (string, string, error)
+	CreateInvite(ctx context.Context, workspaceID, email, displayName string) (string, string, error)
 }
 
 // InviteHandler handles invite requests
@@ -69,7 +69,8 @@ func (h *InviteHandler) ValidateInvite(w http.ResponseWriter, r *http.Request) {
 
 // AcceptInvite handles POST /api/v1/invite/accept
 func (h *InviteHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
-	if _, ok := mw.GetUserID(r.Context()); !ok {
+	workspaceID, ok := mw.GetUserID(r.Context())
+	if !ok {
 		respondError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
@@ -91,8 +92,12 @@ func (h *InviteHandler) CreateInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, inviteURL, err := h.service.CreateInvite(r.Context(), req.Email, req.DisplayName)
+	token, inviteURL, err := h.service.CreateInvite(r.Context(), workspaceID, req.Email, req.DisplayName)
 	if err != nil {
+		if errors.Is(err, models.ErrEntityLimitReached) {
+			respondJSON(w, http.StatusPaymentRequired, ErrorResponse{Error: "entity_limit_reached"})
+			return
+		}
 		log.Error().Err(err).Msg("create invite failed")
 		respondError(w, http.StatusInternalServerError, "internal server error")
 		return

@@ -67,4 +67,7 @@ var (
 
 	// ErrUnauthorizedMessageDelete indicates user cannot delete this message
 	ErrUnauthorizedMessageDelete = errors.New("can only delete your own messages")
+
+	// ErrEntityLimitReached indicates workspace entity cap is reached for current plan.
+	ErrEntityLimitReached = errors.New("entity limit reached")
 )

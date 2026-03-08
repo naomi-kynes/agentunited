@@ -110,12 +110,12 @@ func (h *BillingHandler) Status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]any{
-		"plan":                  sub.Plan,
-		"subscription_status":   sub.Status,
-		"entity_count":          entityCount,
-		"relay_tier":            sub.RelayTier,
-		"relay_subdomain":       sub.RelaySubdomain,
-		"relay_bandwidth_limit": sub.RelayBandwidthLimitMB,
+		"plan":                sub.Plan,
+		"subscription_status": sub.Status,
+		"entity_count":        entityCount,
+		"relay_tier":          sub.RelayTier,
+		"relay_subdomain":     sub.RelaySubdomain,
+		"bandwidth_limit_mb":  sub.RelayBandwidthLimitMB,
 	})
 }
 

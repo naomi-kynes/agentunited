@@ -82,7 +82,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 	billingProvider := billing.NewStub(cfg.Stripe.SecretKey != "" && cfg.Stripe.PriceIDPro != "")
 	billingService := service.NewBillingService(subscriptionRepo, userRepo, billingProvider, cfg.Stripe.WebhookSecret, cfg.Stripe.PriceIDPro, cfg.Stripe.PriceIDTeam)
 	bootstrapService := service.NewBootstrapService(userRepo, agentRepo, apiKeyRepo, inviteRepo, channelRepo, subscriptionRepo, cfg.JWT.Secret, "https://agentunited.ai", cfg.Relay.Domain, cache.Client)
-	inviteService := service.NewInviteService(userRepo, inviteRepo, cfg.JWT.Secret, "http://localhost:3001")
+	inviteService := service.NewInviteService(userRepo, inviteRepo, subscriptionRepo, cfg.JWT.Secret, "http://localhost:3001")
 	relayService := service.NewRelayService(subscriptionRepo, cfg.Relay.Domain)
 
 	// Initialize WebSocket hub first (needed by message handler)

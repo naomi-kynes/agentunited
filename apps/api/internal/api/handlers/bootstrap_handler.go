@@ -104,6 +104,14 @@ func (h *BootstrapHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusConflict, "instance has already been bootstrapped")
 			return
 		}
+		if errors.Is(err, models.ErrEntityLimitReached) {
+			respondJSON(w, http.StatusPaymentRequired, map[string]any{
+				"error":       "entity_limit_reached",
+				"message":     "Your workspace has reached the plan entity limit.",
+				"upgrade_url": "/pricing",
+			})
+			return
+		}
 
 		log.Error().Err(err).Msg("bootstrap failed")
 		respondError(w, http.StatusInternalServerError, "internal server error")

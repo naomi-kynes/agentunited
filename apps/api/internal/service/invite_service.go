@@ -18,24 +18,27 @@ import (
 
 // InviteService handles invite operations
 type InviteService struct {
-	userRepo   repository.UserRepository
-	inviteRepo repository.InviteRepository
-	jwtSecret  string
-	baseURL    string
+	userRepo         repository.UserRepository
+	inviteRepo       repository.InviteRepository
+	subscriptionRepo repository.SubscriptionRepository
+	jwtSecret        string
+	baseURL          string
 }
 
 // NewInviteService creates a new invite service
 func NewInviteService(
 	userRepo repository.UserRepository,
 	inviteRepo repository.InviteRepository,
+	subscriptionRepo repository.SubscriptionRepository,
 	jwtSecret string,
 	baseURL string,
 ) *InviteService {
 	return &InviteService{
-		userRepo:   userRepo,
-		inviteRepo: inviteRepo,
-		jwtSecret:  jwtSecret,
-		baseURL:    baseURL,
+		userRepo:         userRepo,
+		inviteRepo:       inviteRepo,
+		subscriptionRepo: subscriptionRepo,
+		jwtSecret:        jwtSecret,
+		baseURL:          baseURL,
 	}
 }
 
@@ -111,7 +114,10 @@ func (s *InviteService) AcceptInvite(ctx context.Context, token, password, displ
 }
 
 // CreateInvite creates a new invite for a human user and returns plaintext token + URL.
-func (s *InviteService) CreateInvite(ctx context.Context, email, displayName string) (string, string, error) {
+func (s *InviteService) CreateInvite(ctx context.Context, workspaceID, email, displayName string) (string, string, error) {
+	if err := s.checkEntityLimit(ctx, workspaceID, 1); err != nil {
+		return "", "", err
+	}
 	var userID string
 
 	if existing, err := s.userRepo.GetByEmail(ctx, email); err == nil {
@@ -177,6 +183,36 @@ func (s *InviteService) createInviteURL(token string) string {
 }
 
 // generateJWTToken creates a JWT token for the user
+func (s *InviteService) checkEntityLimit(ctx context.Context, workspaceID string, toAdd int64) error {
+	sub, err := s.subscriptionRepo.GetByWorkspace(ctx, workspaceID)
+	if err != nil {
+		return nil // default permissive when subscription row missing
+	}
+	limit := int64(planEntityLimit(sub.Plan))
+	if limit < 0 {
+		return nil
+	}
+	count, err := s.userRepo.Count(ctx)
+	if err != nil {
+		return err
+	}
+	if count+toAdd > limit {
+		return models.ErrEntityLimitReached
+	}
+	return nil
+}
+
+func planEntityLimit(plan string) int {
+	switch plan {
+	case "pro":
+		return 10
+	case "team", "enterprise":
+		return -1
+	default:
+		return 3
+	}
+}
+
 func (s *InviteService) generateJWTToken(userID, email string) (string, error) {
 	claims := &JWTClaims{
 		UserID: userID,
