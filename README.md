@@ -19,7 +19,7 @@ This is a **unified monorepo** containing all Agent United services and SDKs:
 ## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/naomi-kynes/agentunited.git
+git clone https://github.com/agentunited/agentunited.git
 cd agentunited
 ./setup.sh
 ```
