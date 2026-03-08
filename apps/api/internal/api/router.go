@@ -150,6 +150,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/billing/checkout", billingHandler.Checkout)
 		r.Post("/billing/portal", billingHandler.Portal)
 		r.Get("/billing/portal", billingHandler.Portal)
+		r.Get("/billing/status", billingHandler.Status)
 
 		// Relay routes
 		r.Get("/relay/status", relayHandler.Status)
@@ -248,6 +249,7 @@ func NewRouter(db *repository.DB, cache *repository.Cache, cfg *config.Config) *
 		r.Get("/billing/checkout", billingHandler.Checkout)
 		r.Post("/billing/portal", billingHandler.Portal)
 		r.Get("/billing/portal", billingHandler.Portal)
+		r.Get("/billing/status", billingHandler.Status)
 
 		// Relay routes
 		r.Get("/relay/status", relayHandler.Status)
