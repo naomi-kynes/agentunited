@@ -114,14 +114,18 @@ func (s *billingService) HandleWebhook(ctx context.Context, body []byte, signatu
 		sub := &models.Subscription{WorkspaceID: wsID, StripeCustomerID: custID, StripeSubscriptionID: subID, Plan: normalizedPlan, Status: status}
 		applyRelayTierDefaults(sub, normalizedPlan)
 		_ = s.repo.UpsertByWorkspace(ctx, sub)
-	case "customer.subscription.updated", "customer.subscription.deleted":
+	case "customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted":
 		obj := evt.Data.Object
 		wsID := strVal(mapVal(obj, "metadata")["workspace_id"])
 		subID := strVal(obj["id"])
 		custID := strVal(obj["customer"])
 		status := normalizeStatus(strVal(obj["status"]))
 		plan := normalizePlan(strVal(mapVal(obj, "metadata")["plan"]))
-		if plan == "free" {
+		if evt.Type == "customer.subscription.deleted" {
+			plan = "free"
+			status = "canceled"
+		}
+		if plan == "free" && evt.Type != "customer.subscription.deleted" {
 			plan = "pro"
 		}
 		var cpe *time.Time
@@ -132,13 +136,26 @@ func (s *billingService) HandleWebhook(ctx context.Context, body []byte, signatu
 		sub := &models.Subscription{WorkspaceID: wsID, StripeCustomerID: custID, StripeSubscriptionID: subID, Plan: plan, Status: status, CurrentPeriodEnd: cpe}
 		applyRelayTierDefaults(sub, plan)
 		_ = s.repo.UpsertByWorkspace(ctx, sub)
-	case "invoice.payment_failed":
+	case "invoice.payment_succeeded", "invoice.payment_failed":
 		obj := evt.Data.Object
 		subID := strVal(obj["subscription"])
 		wsID := strVal(mapVal(obj, "metadata")["workspace_id"])
 		if subID != "" {
-			sub := &models.Subscription{WorkspaceID: wsID, StripeSubscriptionID: subID, Plan: "pro", Status: "past_due"}
-			applyRelayTierDefaults(sub, "pro")
+			status := "active"
+			if evt.Type == "invoice.payment_failed" {
+				status = "past_due"
+			}
+			plan := normalizePlan(strVal(mapVal(obj, "metadata")["plan"]))
+			if plan == "free" {
+				plan = "pro"
+			}
+			var cpe *time.Time
+			if unix := int64Val(obj["period_end"]); unix > 0 {
+				t := time.Unix(unix, 0).UTC()
+				cpe = &t
+			}
+			sub := &models.Subscription{WorkspaceID: wsID, StripeSubscriptionID: subID, Plan: plan, Status: status, CurrentPeriodEnd: cpe}
+			applyRelayTierDefaults(sub, plan)
 			_ = s.repo.UpsertByWorkspace(ctx, sub)
 		}
 	}
