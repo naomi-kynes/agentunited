@@ -90,7 +90,10 @@ func (s *billingService) HandleWebhook(ctx context.Context, body []byte, signatu
 			plan = "pro"
 		}
 		status := "active"
-		_ = s.repo.UpsertByWorkspace(ctx, &models.Subscription{WorkspaceID: wsID, StripeCustomerID: custID, StripeSubscriptionID: subID, Plan: normalizePlan(plan), Status: status})
+		normalizedPlan := normalizePlan(plan)
+		sub := &models.Subscription{WorkspaceID: wsID, StripeCustomerID: custID, StripeSubscriptionID: subID, Plan: normalizedPlan, Status: status}
+		applyRelayTierDefaults(sub, normalizedPlan)
+		_ = s.repo.UpsertByWorkspace(ctx, sub)
 	case "customer.subscription.updated", "customer.subscription.deleted":
 		obj := evt.Data.Object
 		wsID := strVal(mapVal(obj, "metadata")["workspace_id"])
@@ -106,13 +109,17 @@ func (s *billingService) HandleWebhook(ctx context.Context, body []byte, signatu
 			t := time.Unix(unix, 0).UTC()
 			cpe = &t
 		}
-		_ = s.repo.UpsertByWorkspace(ctx, &models.Subscription{WorkspaceID: wsID, StripeCustomerID: custID, StripeSubscriptionID: subID, Plan: plan, Status: status, CurrentPeriodEnd: cpe})
+		sub := &models.Subscription{WorkspaceID: wsID, StripeCustomerID: custID, StripeSubscriptionID: subID, Plan: plan, Status: status, CurrentPeriodEnd: cpe}
+		applyRelayTierDefaults(sub, plan)
+		_ = s.repo.UpsertByWorkspace(ctx, sub)
 	case "invoice.payment_failed":
 		obj := evt.Data.Object
 		subID := strVal(obj["subscription"])
 		wsID := strVal(mapVal(obj, "metadata")["workspace_id"])
 		if subID != "" {
-			_ = s.repo.UpsertByWorkspace(ctx, &models.Subscription{WorkspaceID: wsID, StripeSubscriptionID: subID, Plan: "pro", Status: "past_due"})
+			sub := &models.Subscription{WorkspaceID: wsID, StripeSubscriptionID: subID, Plan: "pro", Status: "past_due"}
+			applyRelayTierDefaults(sub, "pro")
+			_ = s.repo.UpsertByWorkspace(ctx, sub)
 		}
 	}
 	return nil
@@ -186,5 +193,24 @@ func normalizeStatus(s string) string {
 		return s
 	default:
 		return "active"
+	}
+}
+
+func applyRelayTierDefaults(sub *models.Subscription, plan string) {
+	now := time.Now().UTC()
+	switch normalizePlan(plan) {
+	case "pro", "enterprise":
+		sub.RelayTier = "pro"
+		sub.RelayBandwidthLimitMB = 51200
+		sub.RelayConnectionsMax = 20
+		sub.RelayCustomSubdomain = true
+		sub.RelayExpiresAt = nil
+	default:
+		expires := now.Add(30 * 24 * time.Hour)
+		sub.RelayTier = "free"
+		sub.RelayBandwidthLimitMB = 1024
+		sub.RelayConnectionsMax = 3
+		sub.RelayCustomSubdomain = false
+		sub.RelayExpiresAt = &expires
 	}
 }
