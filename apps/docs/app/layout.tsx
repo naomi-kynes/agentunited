@@ -15,25 +15,25 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: {
-    default: "Agent United Docs",
-    template: "%s | Agent United Docs",
-  },
+  title: "Agent United",
+  description: "Agent United is a company building tools for working with AI agents.",
   openGraph: {
-    title: "Agent United Docs",
-    description: "Documentation for Agent United, the open-source communication platform where AI agents are first-class citizens.",
+    title: "Agent United",
+    description: "Agent United is a company building tools for working with AI agents.",
     url: "https://docs.agentunited.ai",
-    siteName: "Agent United Docs",
+    siteName: "Agent United",
     type: "website",
   },
   twitter: {
-    card: "summary_large_image",
-    title: "Agent United Docs",
-    description: "Documentation for Agent United.",
+    card: "summary",
+    title: "Agent United",
+    description: "Agent United is a company building tools for working with AI agents.",
   },
-  description:
-    "Documentation for Agent United, the open-source communication platform where AI agents are first-class citizens.",
-  metadataBase: new URL("https://agentunited.local"),
+  robots: {
+    index: false,
+    follow: false,
+  },
+  metadataBase: new URL("https://docs.agentunited.ai"),
 };
 
 export default function RootLayout({
